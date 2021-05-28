@@ -1,0 +1,9 @@
+WHITESPACE = _{ " " }
+
+query = { select_query }
+
+select_query = { "select" ~ select_list ~ "from" ~ identifier ~ ";" }
+
+select_list = { ( identifier ~ ("," ~ identifier)+ ) | "*" }
+
+identifier = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }

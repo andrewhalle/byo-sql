@@ -1,5 +1,14 @@
+#[macro_use]
+extern crate pest_derive;
+use pest::iterators::Pair;
+use pest::Parser;
+
 use std::fmt::{Display, Formatter};
 use std::io::{self, BufRead, Write};
+
+#[derive(Parser)]
+#[grammar = "query.pest"]
+pub struct QueryParser;
 
 struct Database {
     tables: Vec<Table>,
@@ -43,18 +52,90 @@ impl Display for Value {
 #[derive(Clone)]
 struct Row(Vec<Value>);
 
-struct Query;
+#[derive(Debug)]
+enum Query<'a> {
+    SelectQuery(SelectQuery<'a>),
+}
 
-impl Query {
-    // TODO actually parse SQL
-    fn from(source: &str) -> Self {
-        Query
+#[derive(Debug)]
+struct SelectQuery<'a> {
+    select_list: Vec<&'a str>,
+    table: &'a str,
+}
+
+impl<'a> SelectQuery<'a> {
+    fn from(select_query: Pair<'a, Rule>) -> Self {
+        let mut inner = select_query.into_inner();
+
+        let select_list = inner.next().unwrap();
+        let select_list = {
+            let inner: Vec<_> = select_list.into_inner().collect();
+            if inner.len() == 0 {
+                vec!["*"]
+            } else {
+                inner.iter().map(|identifier| identifier.as_str()).collect()
+            }
+        };
+
+        let table = inner.next().unwrap().as_str();
+
+        SelectQuery { select_list, table }
+    }
+}
+
+impl<'a> Query<'a> {
+    fn from(source: &'a str) -> Self {
+        let parse = QueryParser::parse(Rule::query, source);
+
+        let query = parse.unwrap().next().unwrap();
+        let query = query.into_inner().next().unwrap();
+        match query.as_rule() {
+            Rule::select_query => Query::SelectQuery(SelectQuery::from(query)),
+            _ => unreachable!(),
+        }
     }
 }
 
 struct QueryResult {
     columns: Vec<Column>,
     rows: Vec<Row>,
+}
+
+impl QueryResult {
+    fn select(&mut self, columns: Vec<&str>) {
+        if columns.len() == 1 && columns[0] == "*" {
+            return;
+        } else {
+            let indices: Vec<usize> = columns
+                .iter()
+                .map(|c| {
+                    self.columns
+                        .iter()
+                        .map(|c| &c.name)
+                        .enumerate()
+                        .find(|(_, x)| x == c)
+                        .unwrap()
+                        .0
+                })
+                .collect();
+
+            let mut new_columns = Vec::new();
+            for i in indices.iter() {
+                new_columns.push(self.columns[*i].clone());
+            }
+            self.columns = new_columns;
+
+            for row in self.rows.iter_mut() {
+                let mut new_row = Vec::new();
+                for i in indices.iter() {
+                    new_row.push(row.0[*i].clone());
+                }
+                *row = Row(new_row);
+            }
+
+            return;
+        }
+    }
 }
 
 impl Display for QueryResult {
@@ -116,10 +197,16 @@ impl Database {
 
     fn execute(&mut self, query: Query) -> QueryResult {
         let table = &self.tables[0];
-
-        QueryResult {
+        let mut result = QueryResult {
             columns: table.columns.clone(),
             rows: table.rows.clone(),
+        };
+
+        match query {
+            Query::SelectQuery(query) => {
+                result.select(query.select_list);
+                result
+            }
         }
     }
 
