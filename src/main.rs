@@ -1,11 +1,12 @@
+use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
+use std::io::{self, BufRead, Write};
+
 #[macro_use]
 extern crate pest_derive;
 use pest::error::Error;
 use pest::iterators::Pair;
 use pest::Parser;
-
-use std::fmt::{Display, Formatter};
-use std::io::{self, BufRead, Write};
 
 #[derive(Parser)]
 #[grammar = "query.pest"]
@@ -21,6 +22,44 @@ struct Table {
     rows: Vec<Row>,
 }
 
+impl Table {
+    fn validate_insert_query_columns(&self, insert_query_columns: &[&str]) -> Option<Vec<usize>> {
+        // first check that all columns are provided
+        {
+            let self_columns: HashSet<&str> =
+                self.columns.iter().map(|c| c.name.as_str()).collect();
+            let insert_query_columns: HashSet<&str> =
+                insert_query_columns.iter().map(|c| *c).collect();
+
+            if self_columns != insert_query_columns {
+                return None;
+            }
+        }
+
+        // then map the insert_query_column to the index in the table specificiation
+        let self_columns: Vec<(usize, &str)> = self
+            .columns
+            .iter()
+            .map(|c| c.name.as_str())
+            .enumerate()
+            .collect();
+        let indices = insert_query_columns
+            .iter()
+            .map(|c1| self_columns.iter().find(|(_, c2)| c1 == c2).unwrap().0)
+            .collect();
+        Some(indices)
+    }
+
+    fn new_values_vec(&self) -> Vec<Value> {
+        vec![Value::Null; self.columns.len()]
+    }
+
+    fn compatible_type(&self, column_index: usize, value: &Value) -> bool {
+        let column = &self.columns[column_index];
+        value.assignable_to(column.datatype)
+    }
+}
+
 #[derive(Clone)]
 struct Column {
     name: String,
@@ -28,7 +67,7 @@ struct Column {
 }
 
 // TODO this and Value are very similar
-#[derive(Clone)]
+#[derive(PartialEq, Clone, Copy)]
 enum Datatype {
     Number,
     Text,
@@ -37,8 +76,19 @@ enum Datatype {
 // TODO this and Datatype are very similar
 #[derive(Debug, Clone)]
 enum Value {
+    Null,
     Number(u32),
     Text(String),
+}
+
+impl Value {
+    fn assignable_to(&self, datatype: Datatype) -> bool {
+        match self {
+            Value::Null => true,
+            Value::Number(_) => datatype == Datatype::Number,
+            Value::Text(_) => datatype == Datatype::Text,
+        }
+    }
 }
 
 impl Display for Value {
@@ -46,6 +96,7 @@ impl Display for Value {
         match self {
             Value::Number(n) => write!(f, "{}", n),
             Value::Text(s) => write!(f, "{}", s),
+            Value::Null => write!(f, "null"),
         }
     }
 }
@@ -296,9 +347,29 @@ impl Database {
                 QueryResult::SelectQueryResult(result)
             }
             Query::InsertQuery(query) => {
-                dbg!(&query);
+                if query.column_list.len() != query.values.len() {
+                    panic!();
+                }
 
-                // TODO
+                let table = &mut self.tables[0];
+                let mut indices = table
+                    .validate_insert_query_columns(&query.column_list)
+                    .unwrap();
+                let mut row = table.new_values_vec();
+                let mut values = query.values;
+
+                while values.len() != 0 {
+                    let i = indices.pop().unwrap();
+                    let value = values.pop().unwrap();
+
+                    if !table.compatible_type(i, &value) {
+                        panic!();
+                    }
+
+                    row[i] = value;
+                }
+
+                table.rows.push(Row(row));
 
                 QueryResult::InsertQueryResult(InsertQueryResult { num_inserted: 1 })
             }
