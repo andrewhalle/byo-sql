@@ -34,7 +34,7 @@ enum Datatype {
 }
 
 // TODO this and Datatype are very similar
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 enum Value {
     Number(u32),
     Text(String),
@@ -55,6 +55,7 @@ struct Row(Vec<Value>);
 #[derive(Debug)]
 enum Query<'a> {
     SelectQuery(SelectQuery<'a>),
+    InsertQuery(InsertQuery<'a>),
 }
 
 #[derive(Debug)]
@@ -83,6 +84,27 @@ impl<'a> SelectQuery<'a> {
     }
 }
 
+#[derive(Debug)]
+struct InsertQuery<'a> {
+    table: &'a str,
+    column_list: Vec<&'a str>,
+    values: Vec<Value>,
+}
+
+impl<'a> InsertQuery<'a> {
+    fn from(insert_query: Pair<'a, Rule>) -> Self {
+        dbg!(&insert_query);
+
+        // TODO
+
+        InsertQuery {
+            table: "",
+            column_list: Vec::new(),
+            values: Vec::new(),
+        }
+    }
+}
+
 impl<'a> Query<'a> {
     fn from(source: &'a str) -> Self {
         let parse = QueryParser::parse(Rule::query, source);
@@ -91,6 +113,7 @@ impl<'a> Query<'a> {
         let query = query.into_inner().next().unwrap();
         match query.as_rule() {
             Rule::select_query => Query::SelectQuery(SelectQuery::from(query)),
+            Rule::insert_query => Query::InsertQuery(InsertQuery::from(query)),
             _ => unreachable!(),
         }
     }
@@ -207,6 +230,7 @@ impl Database {
                 result.select(query.select_list);
                 result
             }
+            _ => todo!(),
         }
     }
 

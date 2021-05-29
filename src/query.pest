@@ -1,9 +1,17 @@
 WHITESPACE = _{ " " }
+non_single_quote = { !"'" ~ ANY }
 
-query = { select_query }
+query = { (select_query | insert_query) ~ ";" }
 
-select_query = { "select" ~ select_list ~ "from" ~ identifier ~ ";" }
+select_query = { "select" ~ column_list ~ "from" ~ identifier }
+insert_query = {
+  "insert" ~ "into" ~ identifier ~ "(" ~ column_list ~ ")" ~ "values" ~ "(" ~ literal_list ~ ")"
+}
 
-select_list = { ( identifier ~ ("," ~ identifier)+ ) | "*" }
+column_list = { ( identifier ~ ("," ~ identifier)* ) | "*" }
+literal_list = { literal ~ ("," ~ literal)* }
 
 identifier = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
+literal = { number_literal | string_literal }
+number_literal = { ASCII_DIGIT+ }
+string_literal = { "'" ~ ("\\'" | non_single_quote)+ ~ "'" }
