@@ -93,14 +93,51 @@ struct InsertQuery<'a> {
 
 impl<'a> InsertQuery<'a> {
     fn from(insert_query: Pair<'a, Rule>) -> Self {
-        dbg!(&insert_query);
+        let mut inner = insert_query.into_inner();
 
-        // TODO
+        let table = inner.next().unwrap().as_str();
+
+        let column_list = {
+            let inner = inner.next().unwrap().into_inner();
+            let mut column_list = Vec::new();
+
+            for identifier in inner {
+                column_list.push(identifier.as_str());
+            }
+
+            column_list
+        };
+
+        let values = {
+            let inner = inner.next().unwrap().into_inner();
+            let mut values = Vec::new();
+
+            for literal in inner {
+                let literal = literal.into_inner().next().unwrap();
+                let value = match literal.as_rule() {
+                    Rule::string_literal => {
+                        let string_literal_contents = literal.into_inner().next().unwrap();
+
+                        Value::Text(string_literal_contents.as_str().to_owned())
+                    }
+                    Rule::number_literal => {
+                        let num: u32 = literal.as_str().parse().unwrap();
+
+                        Value::Number(num)
+                    }
+                    _ => unreachable!(),
+                };
+
+                values.push(value);
+            }
+
+            values
+        };
 
         InsertQuery {
-            table: "",
-            column_list: Vec::new(),
-            values: Vec::new(),
+            table,
+            column_list,
+            values,
         }
     }
 }
@@ -119,12 +156,21 @@ impl<'a> Query<'a> {
     }
 }
 
-struct QueryResult {
+enum QueryResult {
+    SelectQueryResult(SelectQueryResult),
+    InsertQueryResult(InsertQueryResult),
+}
+
+struct SelectQueryResult {
     columns: Vec<Column>,
     rows: Vec<Row>,
 }
 
-impl QueryResult {
+struct InsertQueryResult {
+    num_inserted: u32,
+}
+
+impl SelectQueryResult {
     fn select(&mut self, columns: Vec<&str>) {
         if columns.len() == 1 && columns[0] == "*" {
             return;
@@ -161,7 +207,7 @@ impl QueryResult {
     }
 }
 
-impl Display for QueryResult {
+impl Display for SelectQueryResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let column_names: Vec<&str> = self.columns.iter().map(|c| c.name.as_str()).collect();
         writeln!(f, "{}", &column_names.join(",")).unwrap();
@@ -176,6 +222,21 @@ impl Display for QueryResult {
         }
 
         Ok(())
+    }
+}
+
+impl Display for InsertQueryResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "INSERT {}", self.num_inserted)
+    }
+}
+
+impl Display for QueryResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            QueryResult::SelectQueryResult(qr) => write!(f, "{}", qr),
+            QueryResult::InsertQueryResult(qr) => write!(f, "{}", qr),
+        }
     }
 }
 
@@ -219,18 +280,25 @@ impl Database {
     }
 
     fn execute(&mut self, query: Query) -> QueryResult {
-        let table = &self.tables[0];
-        let mut result = QueryResult {
-            columns: table.columns.clone(),
-            rows: table.rows.clone(),
-        };
-
         match query {
             Query::SelectQuery(query) => {
+                let table = &self.tables[0];
+                let mut result = SelectQueryResult {
+                    columns: table.columns.clone(),
+                    rows: table.rows.clone(),
+                };
+
                 result.select(query.select_list);
-                result
+
+                QueryResult::SelectQueryResult(result)
             }
-            _ => todo!(),
+            Query::InsertQuery(query) => {
+                dbg!(&query);
+
+                // TODO
+
+                QueryResult::InsertQueryResult(InsertQueryResult { num_inserted: 1 })
+            }
         }
     }
 

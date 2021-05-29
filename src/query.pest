@@ -1,5 +1,6 @@
 WHITESPACE = _{ " " }
-non_single_quote = { !"'" ~ ANY }
+non_single_quote = _{ !"'" ~ ANY }
+string_literal_contents = { ("\\'" | non_single_quote)+ }
 
 query = { (select_query | insert_query) ~ ";" }
 
@@ -12,6 +13,7 @@ column_list = { ( identifier ~ ("," ~ identifier)* ) | "*" }
 literal_list = { literal ~ ("," ~ literal)* }
 
 identifier = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
+
 literal = { number_literal | string_literal }
-number_literal = { ASCII_DIGIT+ }
-string_literal = { "'" ~ ("\\'" | non_single_quote)+ ~ "'" }
+  number_literal = { ASCII_DIGIT+ }
+  string_literal = { "'" ~ string_literal_contents ~ "'" }
