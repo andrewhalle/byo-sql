@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate pest_derive;
+use pest::error::Error;
 use pest::iterators::Pair;
 use pest::Parser;
 
@@ -143,16 +144,18 @@ impl<'a> InsertQuery<'a> {
 }
 
 impl<'a> Query<'a> {
-    fn from(source: &'a str) -> Self {
-        let parse = QueryParser::parse(Rule::query, source);
+    fn from(source: &'a str) -> Result<Self, Error<Rule>> {
+        let mut parse = QueryParser::parse(Rule::query, source)?;
 
-        let query = parse.unwrap().next().unwrap();
+        let query = parse.next().unwrap();
         let query = query.into_inner().next().unwrap();
-        match query.as_rule() {
+        let query = match query.as_rule() {
             Rule::select_query => Query::SelectQuery(SelectQuery::from(query)),
             Rule::insert_query => Query::InsertQuery(InsertQuery::from(query)),
             _ => unreachable!(),
-        }
+        };
+
+        Ok(query)
     }
 }
 
@@ -320,8 +323,16 @@ impl Database {
             }
 
             let query = Query::from(&line);
-            let result = self.execute(query);
-            println!("{}", result);
+
+            match query {
+                Ok(query) => {
+                    let result = self.execute(query);
+                    println!("{}", result);
+                }
+                Err(parse_error) => {
+                    println!("{}", parse_error);
+                }
+            }
         }
     }
 }
