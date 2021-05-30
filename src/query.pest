@@ -1,8 +1,9 @@
-WHITESPACE = _{ " " }
+WHITESPACE = _{ " " | "\n" }
 non_single_quote = _{ !"'" ~ ANY }
 string_literal_contents = { ("\\'" | non_single_quote)+ }
 alphanum_or_underscore = { (ASCII_ALPHANUMERIC | "_") }
 
+queries = { query* }
 query = { (select_query | insert_query | create_table_query) ~ ";" }
 
 select_query = { "select" ~ column_list ~ "from" ~ identifier ~ where_clause? }

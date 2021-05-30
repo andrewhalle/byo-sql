@@ -1,13 +1,18 @@
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
+use std::fs;
 use std::io::{self, BufRead, Write};
 use std::mem;
+use std::path::PathBuf;
+use std::process;
 
 #[macro_use]
 extern crate pest_derive;
 use pest::error::Error;
 use pest::iterators::Pair;
 use pest::Parser;
+
+use structopt::StructOpt;
 
 #[derive(Parser)]
 #[grammar = "query.pest"]
@@ -298,6 +303,27 @@ impl<'a> Query<'a> {
 
         Ok(query)
     }
+
+    // TODO remove duplication
+    fn get_many(source: &'a str) -> Result<Vec<Self>, Error<Rule>> {
+        let mut parse = QueryParser::parse(Rule::queries, source)?;
+        let queries = parse.next().unwrap();
+        let inner = queries.into_inner();
+
+        let mut queries = Vec::new();
+        for query in inner {
+            let query = query.into_inner().next().unwrap();
+            let query = match query.as_rule() {
+                Rule::select_query => Query::SelectQuery(SelectQuery::from(query)),
+                Rule::insert_query => Query::InsertQuery(InsertQuery::from(query)),
+                Rule::create_table_query => Query::CreateTableQuery(CreateTableQuery::from(query)),
+                _ => unreachable!(),
+            };
+            queries.push(query);
+        }
+
+        Ok(queries)
+    }
 }
 
 enum QueryResult {
@@ -519,16 +545,38 @@ impl Database {
             }
         }
     }
+
+    fn seed(&mut self, seed_file: PathBuf) {
+        let seed = fs::read_to_string(seed_file).unwrap();
+        let queries = Query::get_many(&seed);
+
+        match queries {
+            Ok(queries) => {
+                for query in queries {
+                    self.execute(query);
+                }
+            }
+            Err(parse_error) => {
+                println!("{}", parse_error);
+                process::exit(1);
+            }
+        }
+    }
 }
 
-#[derive(Debug)]
-struct User {
-    id: String,
-    email: String,
-    age: u32,
+#[derive(Debug, StructOpt)]
+struct Opt {
+    #[structopt(short, parse(from_os_str))]
+    seed_file: Option<PathBuf>,
 }
 
 fn main() {
+    let opt = Opt::from_args();
+
     let mut db = Database::new();
+    if let Some(seed_file) = opt.seed_file {
+        db.seed(seed_file);
+    }
+
     db.console();
 }
