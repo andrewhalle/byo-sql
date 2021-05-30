@@ -4,10 +4,12 @@ string_literal_contents = { ("\\'" | non_single_quote)+ }
 
 query = { (select_query | insert_query) ~ ";" }
 
-select_query = { "select" ~ column_list ~ "from" ~ identifier }
+select_query = { "select" ~ column_list ~ "from" ~ identifier ~ where_clause? }
 insert_query = {
   "insert" ~ "into" ~ identifier ~ "(" ~ column_list ~ ")" ~ "values" ~ "(" ~ literal_list ~ ")"
 }
+
+where_clause = { "where" ~ identifier ~ "=" ~ literal }
 
 column_list = { ( identifier ~ ("," ~ identifier)* ) | "*" }
 literal_list = { literal ~ ("," ~ literal)* }

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::io::{self, BufRead, Write};
+use std::mem;
 
 #[macro_use]
 extern crate pest_derive;
@@ -74,7 +75,7 @@ enum Datatype {
 }
 
 // TODO this and Datatype are very similar
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Value {
     Null,
     Number(u32),
@@ -87,6 +88,25 @@ impl Value {
             Value::Null => true,
             Value::Number(_) => datatype == Datatype::Number,
             Value::Text(_) => datatype == Datatype::Text,
+        }
+    }
+
+    fn from(literal: Pair<'_, Rule>) -> Self {
+        assert_eq!(literal.as_rule(), Rule::literal);
+
+        let literal = literal.into_inner().next().unwrap();
+        match literal.as_rule() {
+            Rule::string_literal => {
+                let string_literal_contents = literal.into_inner().next().unwrap();
+
+                Value::Text(string_literal_contents.as_str().to_owned())
+            }
+            Rule::number_literal => {
+                let num: u32 = literal.as_str().parse().unwrap();
+
+                Value::Number(num)
+            }
+            _ => unreachable!(),
         }
     }
 }
@@ -114,6 +134,18 @@ enum Query<'a> {
 struct SelectQuery<'a> {
     select_list: Vec<&'a str>,
     table: &'a str,
+    filter: Option<Filter<'a>>,
+}
+
+#[derive(Debug)]
+enum Filter<'a> {
+    Eq(FilterEq<'a>),
+}
+
+#[derive(Debug)]
+struct FilterEq<'a> {
+    column: &'a str,
+    value: Value,
 }
 
 impl<'a> SelectQuery<'a> {
@@ -132,7 +164,32 @@ impl<'a> SelectQuery<'a> {
 
         let table = inner.next().unwrap().as_str();
 
-        SelectQuery { select_list, table }
+        let mut retval = SelectQuery {
+            select_list,
+            table,
+            filter: None,
+        };
+
+        loop {
+            let optional = inner.next();
+            if let Some(tree) = optional {
+                match tree.as_rule() {
+                    Rule::where_clause => {
+                        let mut inner = tree.into_inner();
+
+                        let column = inner.next().unwrap().as_str();
+                        let value = Value::from(inner.next().unwrap());
+
+                        retval.filter = Some(Filter::Eq(FilterEq { column, value }));
+                    }
+                    _ => unreachable!(),
+                }
+            } else {
+                break;
+            }
+        }
+
+        retval
     }
 }
 
@@ -165,20 +222,7 @@ impl<'a> InsertQuery<'a> {
             let mut values = Vec::new();
 
             for literal in inner {
-                let literal = literal.into_inner().next().unwrap();
-                let value = match literal.as_rule() {
-                    Rule::string_literal => {
-                        let string_literal_contents = literal.into_inner().next().unwrap();
-
-                        Value::Text(string_literal_contents.as_str().to_owned())
-                    }
-                    Rule::number_literal => {
-                        let num: u32 = literal.as_str().parse().unwrap();
-
-                        Value::Number(num)
-                    }
-                    _ => unreachable!(),
-                };
+                let value = Value::from(literal);
 
                 values.push(value);
             }
@@ -257,6 +301,31 @@ impl SelectQueryResult {
             }
 
             return;
+        }
+    }
+
+    fn filter(&mut self, filter: &Filter<'_>) {
+        match filter {
+            Filter::Eq(filter) => {
+                let idx = self
+                    .columns
+                    .iter()
+                    .enumerate()
+                    .find(|(_, c)| c.name == filter.column)
+                    .unwrap()
+                    .0;
+
+                let predicate = |row: &Row| row.0[idx] == filter.value;
+
+                let mut rows = Vec::new();
+                mem::swap(&mut rows, &mut self.rows);
+
+                for row in rows.into_iter() {
+                    if predicate(&row) {
+                        self.rows.push(row);
+                    }
+                }
+            }
         }
     }
 }
@@ -341,6 +410,10 @@ impl Database {
                     columns: table.columns.clone(),
                     rows: table.rows.clone(),
                 };
+
+                if let Some(filter) = &query.filter {
+                    result.filter(filter);
+                }
 
                 result.select(query.select_list);
 
