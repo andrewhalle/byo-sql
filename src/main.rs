@@ -400,12 +400,39 @@ impl Database {
                 },
             ],
         });
+
+        self.tables.push(Table {
+            name: "addresses".to_string(),
+            rows: Vec::new(),
+            columns: vec![
+                Column {
+                    name: "id".to_string(),
+                    datatype: Datatype::Text,
+                },
+                Column {
+                    name: "user_id".to_string(),
+                    datatype: Datatype::Text,
+                },
+                Column {
+                    name: "type".to_string(),
+                    datatype: Datatype::Text,
+                },
+            ],
+        });
+    }
+
+    fn find_table(&self, table: &str) -> &Table {
+        self.tables.iter().find(|t| t.name == table).unwrap()
+    }
+
+    fn find_table_mut(&mut self, table: &str) -> &mut Table {
+        self.tables.iter_mut().find(|t| t.name == table).unwrap()
     }
 
     fn execute(&mut self, query: Query) -> QueryResult {
         match query {
             Query::SelectQuery(query) => {
-                let table = &self.tables[0];
+                let table = self.find_table(query.table);
                 let mut result = SelectQueryResult {
                     columns: table.columns.clone(),
                     rows: table.rows.clone(),
@@ -424,7 +451,7 @@ impl Database {
                     panic!();
                 }
 
-                let table = &mut self.tables[0];
+                let table = self.find_table_mut(query.table);
                 let mut indices = table
                     .validate_insert_query_columns(&query.column_list)
                     .unwrap();
