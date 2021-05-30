@@ -14,6 +14,8 @@ use pest::Parser;
 
 use structopt::StructOpt;
 
+use ansi_term::Colour;
+
 #[derive(Parser)]
 #[grammar = "query.pest"]
 pub struct QueryParser;
@@ -561,6 +563,9 @@ impl Database {
                 process::exit(1);
             }
         }
+
+        let style = Colour::Fixed(251).italic();
+        println!("{}\n\n{}", style.paint("Seeded with:"), style.paint(&seed));
     }
 }
 
