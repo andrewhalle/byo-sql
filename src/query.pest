@@ -3,20 +3,26 @@ non_single_quote = _{ !"'" ~ ANY }
 string_literal_contents = { ("\\'" | non_single_quote)+ }
 alphanum_or_underscore = { (ASCII_ALPHANUMERIC | "_") }
 
-query = { (select_query | insert_query) ~ ";" }
+query = { (select_query | insert_query | create_table_query) ~ ";" }
 
 select_query = { "select" ~ column_list ~ "from" ~ identifier ~ where_clause? }
 insert_query = {
   "insert" ~ "into" ~ identifier ~ "(" ~ column_list ~ ")" ~ "values" ~ "(" ~ literal_list ~ ")"
 }
+create_table_query = { "create" ~ "table" ~ identifier ~ "(" ~ create_table_column_list ~ ")"}
 
 where_clause = { "where" ~ identifier ~ "=" ~ literal }
 
 column_list = { ( identifier ~ ("," ~ identifier)* ) | "*" }
 literal_list = { literal ~ ("," ~ literal)* }
+create_table_column_list = { create_table_column ~ ("," ~ create_table_column)* }
 
 identifier = @{ ASCII_ALPHA ~ alphanum_or_underscore* }
 
 literal = { number_literal | string_literal }
   number_literal = { ASCII_DIGIT+ }
   string_literal = { "'" ~ string_literal_contents ~ "'" }
+
+create_table_column = { identifier ~ datatype }
+
+datatype = { "text" | "number" }

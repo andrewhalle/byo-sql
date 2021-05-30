@@ -61,17 +61,29 @@ impl Table {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Column {
     name: String,
     datatype: Datatype,
 }
 
 // TODO this and Value are very similar
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 enum Datatype {
     Number,
     Text,
+}
+
+impl Datatype {
+    fn from_pair(pair: Pair<'_, Rule>) -> Self {
+        assert_eq!(pair.as_rule(), Rule::datatype);
+
+        match pair.as_str() {
+            "number" => Datatype::Number,
+            "text" => Datatype::Text,
+            _ => unreachable!(),
+        }
+    }
 }
 
 // TODO this and Datatype are very similar
@@ -128,6 +140,7 @@ struct Row(Vec<Value>);
 enum Query<'a> {
     SelectQuery(SelectQuery<'a>),
     InsertQuery(InsertQuery<'a>),
+    CreateTableQuery(CreateTableQuery<'a>),
 }
 
 #[derive(Debug)]
@@ -238,6 +251,38 @@ impl<'a> InsertQuery<'a> {
     }
 }
 
+#[derive(Debug)]
+struct CreateTableQuery<'a> {
+    table_name: &'a str,
+    columns: Vec<Column>,
+}
+
+impl<'a> CreateTableQuery<'a> {
+    fn from(create_table_query: Pair<'a, Rule>) -> Self {
+        let mut inner = create_table_query.into_inner();
+
+        let table_name = inner.next().unwrap().as_str();
+
+        let columns = {
+            let create_table_column_list = inner.next().unwrap();
+            let mut columns = Vec::new();
+            for create_table_column in create_table_column_list.into_inner() {
+                let mut inner = create_table_column.into_inner();
+                let name = inner.next().unwrap().as_str().to_owned();
+                let datatype = Datatype::from_pair(inner.next().unwrap());
+                columns.push(Column { name, datatype });
+            }
+
+            columns
+        };
+
+        CreateTableQuery {
+            table_name,
+            columns,
+        }
+    }
+}
+
 impl<'a> Query<'a> {
     fn from(source: &'a str) -> Result<Self, Error<Rule>> {
         let mut parse = QueryParser::parse(Rule::query, source)?;
@@ -247,6 +292,7 @@ impl<'a> Query<'a> {
         let query = match query.as_rule() {
             Rule::select_query => Query::SelectQuery(SelectQuery::from(query)),
             Rule::insert_query => Query::InsertQuery(InsertQuery::from(query)),
+            Rule::create_table_query => Query::CreateTableQuery(CreateTableQuery::from(query)),
             _ => unreachable!(),
         };
 
@@ -257,6 +303,7 @@ impl<'a> Query<'a> {
 enum QueryResult {
     SelectQueryResult(SelectQueryResult),
     InsertQueryResult(InsertQueryResult),
+    CreateTableQueryResult(CreateTableQueryResult),
 }
 
 struct SelectQueryResult {
@@ -267,6 +314,8 @@ struct SelectQueryResult {
 struct InsertQueryResult {
     num_inserted: u32,
 }
+
+struct CreateTableQueryResult;
 
 impl SelectQueryResult {
     fn select(&mut self, columns: Vec<&str>) {
@@ -354,11 +403,18 @@ impl Display for InsertQueryResult {
     }
 }
 
+impl Display for CreateTableQueryResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "CREATED TABLE")
+    }
+}
+
 impl Display for QueryResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             QueryResult::SelectQueryResult(qr) => write!(f, "{}", qr),
             QueryResult::InsertQueryResult(qr) => write!(f, "{}", qr),
+            QueryResult::CreateTableQueryResult(qr) => write!(f, "{}", qr),
         }
     }
 }
@@ -366,59 +422,6 @@ impl Display for QueryResult {
 impl Database {
     fn new() -> Self {
         Database { tables: Vec::new() }
-    }
-
-    // TODO make this generic over a Rust struct implementing something like a IntoTable trait
-    // currently adds a fixed user table with a fixed row
-    fn add_table(&mut self) {
-        let user1 = vec![
-            Value::Text("1".to_string()),
-            Value::Text("user1@email.com".to_string()),
-            Value::Number(25),
-        ];
-        let user2 = vec![
-            Value::Text("2".to_string()),
-            Value::Text("user2@email.com".to_string()),
-            Value::Number(27),
-        ];
-
-        self.tables.push(Table {
-            name: "users".to_string(),
-            rows: vec![Row(user1), Row(user2)],
-            columns: vec![
-                Column {
-                    name: "id".to_string(),
-                    datatype: Datatype::Text,
-                },
-                Column {
-                    name: "email".to_string(),
-                    datatype: Datatype::Text,
-                },
-                Column {
-                    name: "age".to_string(),
-                    datatype: Datatype::Number,
-                },
-            ],
-        });
-
-        self.tables.push(Table {
-            name: "addresses".to_string(),
-            rows: Vec::new(),
-            columns: vec![
-                Column {
-                    name: "id".to_string(),
-                    datatype: Datatype::Text,
-                },
-                Column {
-                    name: "user_id".to_string(),
-                    datatype: Datatype::Text,
-                },
-                Column {
-                    name: "type".to_string(),
-                    datatype: Datatype::Text,
-                },
-            ],
-        });
     }
 
     fn find_table(&self, table: &str) -> &Table {
@@ -473,6 +476,16 @@ impl Database {
 
                 QueryResult::InsertQueryResult(InsertQueryResult { num_inserted: 1 })
             }
+            Query::CreateTableQuery(query) => {
+                // TODO check that table doesn't exist
+                let table = Table {
+                    name: query.table_name.to_owned(),
+                    columns: query.columns,
+                    rows: Vec::new(),
+                };
+                self.tables.push(table);
+                QueryResult::CreateTableQueryResult(CreateTableQueryResult)
+            }
         }
     }
 
@@ -517,6 +530,5 @@ struct User {
 
 fn main() {
     let mut db = Database::new();
-    db.add_table();
     db.console();
 }
