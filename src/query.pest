@@ -6,17 +6,21 @@ alphanum_or_underscore = { (ASCII_ALPHANUMERIC | "_") }
 queries = { query* }
 query = { (select_query | insert_query | create_table_query) ~ ";" }
 
-select_query = { "select" ~ column_list ~ "from" ~ identifier ~ where_clause? }
+select_query = { "select" ~ column_list ~ "from" ~ table_expression ~ where_clause? }
 insert_query = {
   "insert" ~ "into" ~ identifier ~ "(" ~ column_list ~ ")" ~ "values" ~ "(" ~ literal_list ~ ")"
 }
 create_table_query = { "create" ~ "table" ~ identifier ~ "(" ~ create_table_column_list ~ ")"}
 
+table_expression = { identifier ~ join_clause* }
+
+join_clause = { "join" ~ identifier ~ "on" ~ join_filter }
 where_clause = { "where" ~ identifier ~ "=" ~ literal }
 
 column_list = { ( identifier ~ ("," ~ identifier)* ) | "*" }
 literal_list = { literal ~ ("," ~ literal)* }
 create_table_column_list = { create_table_column ~ ("," ~ create_table_column)* }
+join_filter = { identifier ~ "=" ~ identifier }
 
 identifier = @{ ASCII_ALPHA ~ alphanum_or_underscore* }
 

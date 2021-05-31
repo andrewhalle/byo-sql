@@ -153,19 +153,41 @@ enum Query<'a> {
 #[derive(Debug)]
 struct SelectQuery<'a> {
     select_list: Vec<&'a str>,
-    table: &'a str,
+    table: TableSelection<'a>,
     filter: Option<Filter<'a>>,
 }
 
 #[derive(Debug)]
-enum Filter<'a> {
-    Eq(FilterEq<'a>),
+struct TableSelection<'a> {
+    root_table: &'a str,
+    joins: Vec<TableJoin<'a>>,
 }
 
 #[derive(Debug)]
-struct FilterEq<'a> {
+struct TableJoin<'a> {
+    table: &'a str,
+    first_column: &'a str,
+    second_column: &'a str,
+}
+
+// TODO probably remove this and make a general expression, and turn filtering into a check that
+// the expression, when evaluated against the current result set, is true
+#[derive(Debug)]
+enum Filter<'a> {
+    ColValEq(ColValEq<'a>),
+    ColColEq(ColColEq<'a>),
+}
+
+#[derive(Debug)]
+struct ColValEq<'a> {
     column: &'a str,
     value: Value,
+}
+
+#[derive(Debug)]
+struct ColColEq<'a> {
+    first_column: &'a str,
+    second_column: &'a str,
 }
 
 impl<'a> SelectQuery<'a> {
@@ -182,7 +204,34 @@ impl<'a> SelectQuery<'a> {
             }
         };
 
-        let table = inner.next().unwrap().as_str();
+        let table = {
+            let table_expression = inner.next().unwrap();
+            let mut inner = table_expression.into_inner();
+
+            let root_table = inner.next().unwrap().as_str();
+
+            let mut joins = Vec::new();
+            // remaining tokens are joins
+            for join in inner {
+                let mut inner = join.into_inner();
+
+                let table = inner.next().unwrap().as_str();
+
+                let join_filter = inner.next().unwrap();
+                let mut inner = join_filter.into_inner();
+                let first_column = inner.next().unwrap().as_str();
+                let second_column = inner.next().unwrap().as_str();
+
+                let join = TableJoin {
+                    table,
+                    first_column,
+                    second_column,
+                };
+                joins.push(join);
+            }
+
+            TableSelection { root_table, joins }
+        };
 
         let mut retval = SelectQuery {
             select_list,
@@ -200,7 +249,7 @@ impl<'a> SelectQuery<'a> {
                         let column = inner.next().unwrap().as_str();
                         let value = Value::from(inner.next().unwrap());
 
-                        retval.filter = Some(Filter::Eq(FilterEq { column, value }));
+                        retval.filter = Some(Filter::ColValEq(ColValEq { column, value }));
                     }
                     _ => unreachable!(),
                 }
@@ -383,7 +432,7 @@ impl SelectQueryResult {
 
     fn filter(&mut self, filter: &Filter<'_>) {
         match filter {
-            Filter::Eq(filter) => {
+            Filter::ColValEq(filter) => {
                 let idx = self
                     .columns
                     .iter()
@@ -403,7 +452,48 @@ impl SelectQueryResult {
                     }
                 }
             }
+            Filter::ColColEq(filter) => {
+                let idx1 = self
+                    .columns
+                    .iter()
+                    .enumerate()
+                    .find(|(_, c)| c.name == filter.first_column)
+                    .unwrap()
+                    .0;
+
+                let idx2 = self
+                    .columns
+                    .iter()
+                    .enumerate()
+                    .find(|(_, c)| c.name == filter.second_column)
+                    .unwrap()
+                    .0;
+
+                let predicate = |row: &Row| row.0[idx1] == row.0[idx2];
+
+                let mut rows = Vec::new();
+                mem::swap(&mut rows, &mut self.rows);
+
+                for row in rows.into_iter() {
+                    if predicate(&row) {
+                        self.rows.push(row);
+                    }
+                }
+            }
         }
+    }
+
+    fn cartesian_product(&mut self, mut rhs: Self) {
+        self.columns.append(&mut rhs.columns);
+        let mut rows = Vec::new();
+        for i in self.rows.iter() {
+            for j in rhs.rows.iter() {
+                let mut row = i.0.clone();
+                row.append(&mut j.0.clone());
+                rows.push(Row(row));
+            }
+        }
+        mem::swap(&mut self.rows, &mut rows);
     }
 }
 
@@ -463,11 +553,25 @@ impl Database {
     fn execute(&mut self, query: Query) -> QueryResult {
         match query {
             Query::SelectQuery(query) => {
-                let table = self.find_table(query.table);
+                let table = self.find_table(query.table.root_table);
                 let mut result = SelectQueryResult {
                     columns: table.columns.clone(),
                     rows: table.rows.clone(),
                 };
+
+                for join in query.table.joins {
+                    let table = self.find_table(join.table);
+                    let term = SelectQueryResult {
+                        columns: table.columns.clone(),
+                        rows: table.rows.clone(),
+                    };
+                    result.cartesian_product(term);
+                    let filter = Filter::ColColEq(ColColEq {
+                        first_column: join.first_column,
+                        second_column: join.second_column,
+                    });
+                    result.filter(&filter);
+                }
 
                 if let Some(filter) = &query.filter {
                     result.filter(filter);
