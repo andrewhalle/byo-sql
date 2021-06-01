@@ -1,33 +1,52 @@
+// preliminaries, random small character utilities
 WHITESPACE = _{ " " | "\n" }
 non_single_quote = _{ !"'" ~ ANY }
 string_literal_contents = { ("\\'" | non_single_quote)+ }
 alphanum_or_underscore = { (ASCII_ALPHANUMERIC | "_") }
 
-queries = { query* }
-query = { (select_query | insert_query | create_table_query) ~ ";" }
-
-select_query = { "select" ~ column_list ~ "from" ~ table_expression ~ where_clause? }
-insert_query = {
-  "insert" ~ "into" ~ identifier ~ "(" ~ column_list ~ ")" ~ "values" ~ "(" ~ literal_list ~ ")"
-}
-create_table_query = { "create" ~ "table" ~ identifier ~ "(" ~ create_table_column_list ~ ")"}
-
-table_expression = { identifier ~ join_clause* }
-
-join_clause = { "join" ~ identifier ~ "on" ~ join_filter }
-where_clause = { "where" ~ identifier ~ "=" ~ literal }
-
-column_list = { ( identifier ~ ("," ~ identifier)* ) | "*" }
-literal_list = { literal ~ ("," ~ literal)* }
-create_table_column_list = { create_table_column ~ ("," ~ create_table_column)* }
-join_filter = { identifier ~ "=" ~ identifier }
+// atoms, an identifier doesn't start with a number, and then is alphanumeric +
+// _. a literal is either a number or a string in single quotes
 
 identifier = @{ ASCII_ALPHA ~ alphanum_or_underscore* }
-
 literal = { number_literal | string_literal }
   number_literal = { ASCII_DIGIT+ }
   string_literal = { "'" ~ string_literal_contents ~ "'" }
 
-create_table_column = { identifier ~ datatype }
+// the entry symbol, queries, a list of queries. a query must be terminated by
+// a ;
 
+queries = { query* }
+query = { (select_query | insert_query | create_table_query) ~ ";" }
+
+// select queries, get data from the database
+
+select_query = { "select" ~ column_list ~ "from" ~ table_expression ~ where_clause? }
+column_list = { ( identifier ~ ("," ~ identifier)* ) | "*" }
+
+// table expressions have a root table then a series of joins, with joins
+// specifying the condition to join on
+
+table_expression = { identifier ~ join_clause* }
+join_clause = { "join" ~ identifier ~ "on" ~ join_filter }
+join_filter = { identifier ~ "=" ~ identifier }
+
+// where clauses filter rows out of a select query, only equality of a column
+// with a single value supported
+
+where_clause = { "where" ~ identifier ~ "=" ~ literal }
+
+// insert queries, insert a single row into the database with a list of literal
+// values.
+
+insert_query = {
+  "insert" ~ "into" ~ identifier ~ "(" ~ column_list ~ ")" ~ "values" ~ "(" ~ literal_list ~ ")"
+}
+literal_list = { literal ~ ("," ~ literal)* }
+
+// create table queries, name a table with an identifier, then pass a list of
+// columns to use as the table description.
+
+create_table_query = { "create" ~ "table" ~ identifier ~ "(" ~ create_table_column_list ~ ")"}
+create_table_column_list = { create_table_column ~ ("," ~ create_table_column)* }
+create_table_column = { identifier ~ datatype }
 datatype = { "text" | "number" }
