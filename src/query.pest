@@ -12,6 +12,14 @@ literal = { number_literal | string_literal }
   number_literal = { ASCII_DIGIT+ }
   string_literal = { "'" ~ string_literal_contents ~ "'" }
 
+// allow for aliasing a table
+
+table_identifier = { identifier ~ ("as" ~ identifier)? }
+
+// naming a column might require putting table alias and a dot first
+column = { identifier | "*" }
+column_identifier = { (identifier ~ "." ~ column) | column }
+
 // the entry symbol, queries, a list of queries. a query must be terminated by
 // a ;
 
@@ -21,25 +29,26 @@ query = { (select_query | insert_query | create_table_query) ~ ";" }
 // select queries, get data from the database
 
 select_query = { "select" ~ column_list ~ "from" ~ table_expression ~ where_clause? }
-column_list = { ( identifier ~ ("," ~ identifier)* ) | "*" }
+column_list = { ( column_identifier ~ ("," ~ column_identifier)* ) | "*" }
+identifier_list = { identifier ~ ("," ~ identifier)* }
 
 // table expressions have a root table then a series of joins, with joins
 // specifying the condition to join on
 
-table_expression = { identifier ~ join_clause* }
-join_clause = { "join" ~ identifier ~ "on" ~ join_filter }
-join_filter = { identifier ~ "=" ~ identifier }
+table_expression = { table_identifier ~ join_clause* }
+join_clause = { "join" ~ table_identifier ~ "on" ~ join_filter }
+join_filter = { column_identifier ~ "=" ~ column_identifier }
 
 // where clauses filter rows out of a select query, only equality of a column
 // with a single value supported
 
-where_clause = { "where" ~ identifier ~ "=" ~ literal }
+where_clause = { "where" ~ column_identifier ~ "=" ~ literal }
 
 // insert queries, insert a single row into the database with a list of literal
 // values.
 
 insert_query = {
-  "insert" ~ "into" ~ identifier ~ "(" ~ column_list ~ ")" ~ "values" ~ "(" ~ literal_list ~ ")"
+  "insert" ~ "into" ~ identifier ~ "(" ~ identifier_list ~ ")" ~ "values" ~ "(" ~ literal_list ~ ")"
 }
 literal_list = { literal ~ ("," ~ literal)* }
 

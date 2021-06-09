@@ -30,6 +30,53 @@ struct Table {
     rows: Vec<Row>,
 }
 
+#[derive(Debug)]
+struct TableIdentifier<'a> {
+    name: &'a str,
+    alias: Option<&'a str>,
+}
+
+// TODO document why this makes sense to handle "*" as a column name, even if no table alias is
+// provided (e.g. mysql vs postgres on "select *, * from test;")
+#[derive(Debug)]
+struct ColumnIdentifier<'a> {
+    table_name_or_alias: Option<&'a str>,
+    column: &'a str,
+}
+
+impl<'a> TableIdentifier<'a> {
+    fn from(table_identifier: Pair<'a, Rule>) -> Self {
+        assert_eq!(table_identifier.as_rule(), Rule::table_identifier);
+
+        let mut inner = table_identifier.into_inner();
+
+        let name = inner.next().unwrap().as_str();
+        let alias = inner.next().map(|p| p.as_str());
+
+        TableIdentifier { name, alias }
+    }
+}
+
+impl<'a> ColumnIdentifier<'a> {
+    fn from(column_identifier: Pair<'a, Rule>) -> Self {
+        assert_eq!(column_identifier.as_rule(), Rule::column_identifier);
+
+        let mut pairs: Vec<Pair<'_, Rule>> = column_identifier.into_inner().collect();
+
+        let (table_name_or_alias, column) = if pairs.len() == 1 {
+            (None, pairs.pop().unwrap().as_str())
+        } else {
+            let column = pairs.pop().unwrap().as_str();
+            (Some(pairs.pop().unwrap().as_str()), column)
+        };
+
+        ColumnIdentifier {
+            table_name_or_alias,
+            column,
+        }
+    }
+}
+
 impl Table {
     fn validate_insert_query_columns(&self, insert_query_columns: &[&str]) -> Option<Vec<usize>> {
         // first check that all columns are provided
@@ -152,22 +199,22 @@ enum Query<'a> {
 
 #[derive(Debug)]
 struct SelectQuery<'a> {
-    select_list: Vec<&'a str>,
+    select_list: Vec<ColumnIdentifier<'a>>,
     table: TableSelection<'a>,
     filter: Option<Filter<'a>>,
 }
 
 #[derive(Debug)]
 struct TableSelection<'a> {
-    root_table: &'a str,
+    root_table: TableIdentifier<'a>,
     joins: Vec<TableJoin<'a>>,
 }
 
 #[derive(Debug)]
 struct TableJoin<'a> {
-    table: &'a str,
-    first_column: &'a str,
-    second_column: &'a str,
+    table: TableIdentifier<'a>,
+    first_column: ColumnIdentifier<'a>,
+    second_column: ColumnIdentifier<'a>,
 }
 
 // TODO probably remove this and make a general expression, and turn filtering into a check that
@@ -180,14 +227,14 @@ enum Filter<'a> {
 
 #[derive(Debug)]
 struct ColValEq<'a> {
-    column: &'a str,
+    column: ColumnIdentifier<'a>,
     value: Value,
 }
 
 #[derive(Debug)]
 struct ColColEq<'a> {
-    first_column: &'a str,
-    second_column: &'a str,
+    first_column: ColumnIdentifier<'a>,
+    second_column: ColumnIdentifier<'a>,
 }
 
 impl<'a> SelectQuery<'a> {
@@ -197,30 +244,26 @@ impl<'a> SelectQuery<'a> {
         let select_list = inner.next().unwrap();
         let select_list = {
             let inner: Vec<_> = select_list.into_inner().collect();
-            if inner.len() == 0 {
-                vec!["*"]
-            } else {
-                inner.iter().map(|identifier| identifier.as_str()).collect()
-            }
+            inner.into_iter().map(ColumnIdentifier::from).collect()
         };
 
         let table = {
             let table_expression = inner.next().unwrap();
             let mut inner = table_expression.into_inner();
 
-            let root_table = inner.next().unwrap().as_str();
+            let root_table = TableIdentifier::from(inner.next().unwrap());
 
             let mut joins = Vec::new();
             // remaining tokens are joins
             for join in inner {
                 let mut inner = join.into_inner();
 
-                let table = inner.next().unwrap().as_str();
+                let table = TableIdentifier::from(inner.next().unwrap());
 
                 let join_filter = inner.next().unwrap();
                 let mut inner = join_filter.into_inner();
-                let first_column = inner.next().unwrap().as_str();
-                let second_column = inner.next().unwrap().as_str();
+                let first_column = ColumnIdentifier::from(inner.next().unwrap());
+                let second_column = ColumnIdentifier::from(inner.next().unwrap());
 
                 let join = TableJoin {
                     table,
@@ -246,7 +289,7 @@ impl<'a> SelectQuery<'a> {
                     Rule::where_clause => {
                         let mut inner = tree.into_inner();
 
-                        let column = inner.next().unwrap().as_str();
+                        let column = ColumnIdentifier::from(inner.next().unwrap());
                         let value = Value::from(inner.next().unwrap());
 
                         retval.filter = Some(Filter::ColValEq(ColValEq { column, value }));
@@ -395,8 +438,13 @@ struct InsertQueryResult {
 struct CreateTableQueryResult;
 
 impl SelectQueryResult {
-    fn select(&mut self, columns: Vec<&str>) {
-        if columns.len() == 1 && columns[0] == "*" {
+    // TODO
+    // fn evaluate(&self, expr: Expression) -> Value
+
+    fn select(&mut self, columns: Vec<ColumnIdentifier<'_>>) {
+        // TODO make this work with multiple "*" (e.g. "select *, * from test;"), probably get rid
+        // of the length check altogether
+        if columns.len() == 1 && columns[0].column == "*" {
             return;
         } else {
             let indices: Vec<usize> = columns
@@ -406,7 +454,8 @@ impl SelectQueryResult {
                         .iter()
                         .map(|c| &c.name)
                         .enumerate()
-                        .find(|(_, x)| x == c)
+                        // TODO find correct column according to alias
+                        .find(|(_, x)| x == &c.column)
                         .unwrap()
                         .0
                 })
@@ -437,7 +486,8 @@ impl SelectQueryResult {
                     .columns
                     .iter()
                     .enumerate()
-                    .find(|(_, c)| c.name == filter.column)
+                    // TODO find correct column according to alias
+                    .find(|(_, c)| c.name == filter.column.column)
                     .unwrap()
                     .0;
 
@@ -457,7 +507,8 @@ impl SelectQueryResult {
                     .columns
                     .iter()
                     .enumerate()
-                    .find(|(_, c)| c.name == filter.first_column)
+                    // TODO find correct column according to alias
+                    .find(|(_, c)| c.name == filter.first_column.column)
                     .unwrap()
                     .0;
 
@@ -465,7 +516,8 @@ impl SelectQueryResult {
                     .columns
                     .iter()
                     .enumerate()
-                    .find(|(_, c)| c.name == filter.second_column)
+                    // TODO find correct column according to alias
+                    .find(|(_, c)| c.name == filter.second_column.column)
                     .unwrap()
                     .0;
 
@@ -553,14 +605,14 @@ impl Database {
     fn execute(&mut self, query: Query) -> QueryResult {
         match query {
             Query::SelectQuery(query) => {
-                let table = self.find_table(query.table.root_table);
+                let table = self.find_table(query.table.root_table.name);
                 let mut result = SelectQueryResult {
                     columns: table.columns.clone(),
                     rows: table.rows.clone(),
                 };
 
                 for join in query.table.joins {
-                    let table = self.find_table(join.table);
+                    let table = self.find_table(join.table.name);
                     let term = SelectQueryResult {
                         columns: table.columns.clone(),
                         rows: table.rows.clone(),
