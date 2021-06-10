@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::io::{self, BufRead, Write};
@@ -36,11 +36,32 @@ struct TableIdentifier<'a> {
     alias: Option<&'a str>,
 }
 
+fn new_alias_map(table: &TableIdentifier<'_>) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    match table.alias {
+        None => map.insert(table.name.to_owned(), table.name.to_owned()),
+        Some(alias) => map.insert(alias.to_owned(), table.name.to_owned()),
+    };
+
+    map
+}
+
+fn cmp_column_with_column_identifier(
+    c1: &SelectQueryResultColumn,
+    c2: &ColumnIdentifier<'_>,
+    table_alias_map: &HashMap<String, String>,
+) -> bool {
+    match c2.alias {
+        None => c1.column == c2.column,
+        Some(alias) => &c1.table == table_alias_map.get(alias).unwrap() && c1.column == c2.column,
+    }
+}
+
 // TODO document why this makes sense to handle "*" as a column name, even if no table alias is
 // provided (e.g. mysql vs postgres on "select *, * from test;")
 #[derive(Debug)]
 struct ColumnIdentifier<'a> {
-    table_name_or_alias: Option<&'a str>,
+    alias: Option<&'a str>,
     column: &'a str,
 }
 
@@ -63,17 +84,14 @@ impl<'a> ColumnIdentifier<'a> {
 
         let mut pairs: Vec<Pair<'_, Rule>> = column_identifier.into_inner().collect();
 
-        let (table_name_or_alias, column) = if pairs.len() == 1 {
+        let (alias, column) = if pairs.len() == 1 {
             (None, pairs.pop().unwrap().as_str())
         } else {
             let column = pairs.pop().unwrap().as_str();
             (Some(pairs.pop().unwrap().as_str()), column)
         };
 
-        ColumnIdentifier {
-            table_name_or_alias,
-            column,
-        }
+        ColumnIdentifier { alias, column }
     }
 }
 
@@ -426,9 +444,27 @@ enum QueryResult {
     CreateTableQueryResult(CreateTableQueryResult),
 }
 
+#[derive(Clone)]
+struct SelectQueryResultColumn {
+    table: String,
+    column: String,
+    datatype: Datatype,
+}
+
+impl SelectQueryResultColumn {
+    fn from(table: String, column: &Column) -> Self {
+        SelectQueryResultColumn {
+            table,
+            column: column.name.clone(),
+            datatype: column.datatype.clone(),
+        }
+    }
+}
+
 struct SelectQueryResult {
-    columns: Vec<Column>,
+    columns: Vec<SelectQueryResultColumn>,
     rows: Vec<Row>,
+    table_alias_map: HashMap<String, String>,
 }
 
 struct InsertQueryResult {
@@ -452,10 +488,10 @@ impl SelectQueryResult {
                 .map(|c| {
                     self.columns
                         .iter()
-                        .map(|c| &c.name)
                         .enumerate()
-                        // TODO find correct column according to alias
-                        .find(|(_, x)| x == &c.column)
+                        .find(|(_, x)| {
+                            cmp_column_with_column_identifier(x, c, &self.table_alias_map)
+                        })
                         .unwrap()
                         .0
                 })
@@ -486,8 +522,9 @@ impl SelectQueryResult {
                     .columns
                     .iter()
                     .enumerate()
-                    // TODO find correct column according to alias
-                    .find(|(_, c)| c.name == filter.column.column)
+                    .find(|(_, c)| {
+                        cmp_column_with_column_identifier(c, &filter.column, &self.table_alias_map)
+                    })
                     .unwrap()
                     .0;
 
@@ -508,7 +545,7 @@ impl SelectQueryResult {
                     .iter()
                     .enumerate()
                     // TODO find correct column according to alias
-                    .find(|(_, c)| c.name == filter.first_column.column)
+                    .find(|(_, c)| &(**c).column == filter.first_column.column)
                     .unwrap()
                     .0;
 
@@ -517,7 +554,7 @@ impl SelectQueryResult {
                     .iter()
                     .enumerate()
                     // TODO find correct column according to alias
-                    .find(|(_, c)| c.name == filter.second_column.column)
+                    .find(|(_, c)| &(**c).column == filter.second_column.column)
                     .unwrap()
                     .0;
 
@@ -546,12 +583,15 @@ impl SelectQueryResult {
             }
         }
         mem::swap(&mut self.rows, &mut rows);
+        for (k, v) in rhs.table_alias_map.drain() {
+            self.table_alias_map.insert(k, v);
+        }
     }
 }
 
 impl Display for SelectQueryResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let column_names: Vec<&str> = self.columns.iter().map(|c| c.name.as_str()).collect();
+        let column_names: Vec<&str> = self.columns.iter().map(|c| c.column.as_str()).collect();
         writeln!(f, "{}", &column_names.join(",")).unwrap();
 
         let num_rows = self.rows.len();
@@ -607,15 +647,25 @@ impl Database {
             Query::SelectQuery(query) => {
                 let table = self.find_table(query.table.root_table.name);
                 let mut result = SelectQueryResult {
-                    columns: table.columns.clone(),
+                    columns: table
+                        .columns
+                        .iter()
+                        .map(|c| SelectQueryResultColumn::from(table.name.clone(), c))
+                        .collect(),
                     rows: table.rows.clone(),
+                    table_alias_map: new_alias_map(&query.table.root_table),
                 };
 
                 for join in query.table.joins {
                     let table = self.find_table(join.table.name);
                     let term = SelectQueryResult {
-                        columns: table.columns.clone(),
+                        columns: table
+                            .columns
+                            .iter()
+                            .map(|c| SelectQueryResultColumn::from(table.name.clone(), c))
+                            .collect(),
                         rows: table.rows.clone(),
+                        table_alias_map: new_alias_map(&join.table),
                     };
                     result.cartesian_product(term);
                     let filter = Filter::ColColEq(ColColEq {
