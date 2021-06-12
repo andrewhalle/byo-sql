@@ -10,11 +10,30 @@ use std::process;
 extern crate pest_derive;
 use pest::error::Error;
 use pest::iterators::Pair;
+use pest::prec_climber::{Operator, PrecClimber};
 use pest::Parser;
 
 use structopt::StructOpt;
 
 use ansi_term::Colour;
+
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref PREC_CLIMBER: PrecClimber<Rule> = {
+        use pest::prec_climber::Assoc::*;
+        use Rule::*;
+
+        PrecClimber::new(vec![
+            Operator::new(and, Left) | Operator::new(or, Left),
+            Operator::new(greater_equal, Left)
+                | Operator::new(greater, Left)
+                | Operator::new(less_equal, Left)
+                | Operator::new(less, Left)
+                | Operator::new(equal, Left),
+        ])
+    };
+}
 
 #[derive(Parser)]
 #[grammar = "query.pest"]
@@ -144,6 +163,7 @@ struct Column {
 enum Datatype {
     Number,
     Text,
+    Boolean,
 }
 
 impl Datatype {
@@ -153,6 +173,7 @@ impl Datatype {
         match pair.as_str() {
             "number" => Datatype::Number,
             "text" => Datatype::Text,
+            "boolean" => Datatype::Boolean,
             _ => unreachable!(),
         }
     }
@@ -164,6 +185,7 @@ enum Value {
     Null,
     Number(u32),
     Text(String),
+    Boolean(bool),
 }
 
 impl Value {
@@ -172,6 +194,7 @@ impl Value {
             Value::Null => true,
             Value::Number(_) => datatype == Datatype::Number,
             Value::Text(_) => datatype == Datatype::Text,
+            Value::Boolean(_) => datatype == Datatype::Boolean,
         }
     }
 
@@ -193,6 +216,13 @@ impl Value {
             _ => unreachable!(),
         }
     }
+
+    fn is_true(&self) -> bool {
+        match self {
+            Value::Boolean(b) => *b,
+            _ => panic!("cannot use a non-boolean Value in a boolean context"),
+        }
+    }
 }
 
 impl Display for Value {
@@ -200,6 +230,7 @@ impl Display for Value {
         match self {
             Value::Number(n) => write!(f, "{}", n),
             Value::Text(s) => write!(f, "{}", s),
+            Value::Boolean(b) => write!(f, "{}", b),
             Value::Null => write!(f, "null"),
         }
     }
@@ -219,7 +250,12 @@ enum Query<'a> {
 struct SelectQuery<'a> {
     select_list: Vec<ColumnIdentifier<'a>>,
     table: TableSelection<'a>,
-    filter: Option<Filter<'a>>,
+    filter: Option<Expression<'a>>,
+}
+
+#[derive(Debug)]
+struct Expression<'a> {
+    inner: Pair<'a, Rule>,
 }
 
 #[derive(Debug)]
@@ -306,11 +342,9 @@ impl<'a> SelectQuery<'a> {
                 match tree.as_rule() {
                     Rule::where_clause => {
                         let mut inner = tree.into_inner();
+                        let expression = inner.next().unwrap();
 
-                        let column = ColumnIdentifier::from(inner.next().unwrap());
-                        let value = Value::from(inner.next().unwrap());
-
-                        retval.filter = Some(Filter::ColValEq(ColValEq { column, value }));
+                        retval.filter = Some(Expression { inner: expression });
                     }
                     _ => unreachable!(),
                 }
@@ -474,8 +508,53 @@ struct InsertQueryResult {
 struct CreateTableQueryResult;
 
 impl SelectQueryResult {
-    // TODO
-    // fn evaluate(&self, expr: Expression) -> Value
+    // TODO should this clone?
+    fn get_column_value_from_row(
+        &self,
+        column_identifier: ColumnIdentifier<'_>,
+        row: &Row,
+    ) -> Value {
+        let idx = self
+            .columns
+            .iter()
+            .enumerate()
+            .find(|(_, x)| {
+                cmp_column_with_column_identifier(x, &column_identifier, &self.table_alias_map)
+            })
+            .unwrap()
+            .0;
+
+        row.0[idx].clone()
+    }
+
+    fn evaluate(&self, expr: Expression<'_>, row: &Row) -> Value {
+        PREC_CLIMBER.climb(
+            expr.inner.into_inner(),
+            |pair: Pair<Rule>| match pair.as_rule() {
+                Rule::column_identifier => {
+                    self.get_column_value_from_row(ColumnIdentifier::from(pair), row)
+                }
+                Rule::expression => self.evaluate(
+                    Expression {
+                        inner: pair.clone(),
+                    },
+                    row,
+                ),
+                Rule::literal => Value::from(pair),
+                _ => unreachable!(),
+            },
+            |lhs: Value, op: Pair<Rule>, rhs: Value| match op.as_rule() {
+                Rule::greater_equal => todo!(),
+                Rule::less_equal => todo!(),
+                Rule::greater => todo!(),
+                Rule::less => todo!(),
+                Rule::and => Value::Boolean(lhs.is_true() && rhs.is_true()),
+                Rule::or => Value::Boolean(lhs.is_true() || rhs.is_true()),
+                Rule::equal => Value::Boolean(lhs == rhs),
+                _ => unreachable!(),
+            },
+        )
+    }
 
     fn select(&mut self, columns: Vec<ColumnIdentifier<'_>>) {
         // TODO make this work with multiple "*" (e.g. "select *, * from test;"), probably get rid
@@ -515,6 +594,31 @@ impl SelectQueryResult {
         }
     }
 
+    // TODO rename this to filter after joins have been converted to use Expression
+    // TODO move this to some sort of TableView once it exists.
+    /// Filters a SelectQueryResult by evaluating expression for each row, and keeping it if the
+    /// expression evaluates to true.
+    fn filter_expression(&mut self, expression: &Expression<'_>) {
+        // clone the expression
+        let mut rows = Vec::new();
+        mem::swap(&mut rows, &mut self.rows);
+
+        for row in rows.into_iter() {
+            if self
+                .evaluate(
+                    Expression {
+                        inner: expression.inner.clone(),
+                    },
+                    &row,
+                )
+                .is_true()
+            {
+                self.rows.push(row);
+            }
+        }
+    }
+
+    // TODO remove this after joins have been converted to use Expression
     fn filter(&mut self, filter: &Filter<'_>) {
         match filter {
             Filter::ColValEq(filter) => {
@@ -676,7 +780,7 @@ impl Database {
                 }
 
                 if let Some(filter) = &query.filter {
-                    result.filter(filter);
+                    result.filter_expression(filter);
                 }
 
                 result.select(query.select_list);

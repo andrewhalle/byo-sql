@@ -39,10 +39,10 @@ table_expression = { table_identifier ~ join_clause* }
 join_clause = { "join" ~ table_identifier ~ "on" ~ join_filter }
 join_filter = { column_identifier ~ "=" ~ column_identifier }
 
-// where clauses filter rows out of a select query, only equality of a column
-// with a single value supported
+// where clauses filter rows out of a select query
+// evaluate the expression, and keep the row if it's true
 
-where_clause = { "where" ~ column_identifier ~ "=" ~ literal }
+where_clause = { "where" ~ expression }
 
 // insert queries, insert a single row into the database with a list of literal
 // values.
@@ -58,4 +58,17 @@ literal_list = { literal ~ ("," ~ literal)* }
 create_table_query = { "create" ~ "table" ~ identifier ~ "(" ~ create_table_column_list ~ ")"}
 create_table_column_list = { create_table_column ~ ("," ~ create_table_column)* }
 create_table_column = { identifier ~ datatype }
-datatype = { "text" | "number" }
+datatype = { "text" | "number" | "boolean" }
+
+// work on actual expressions
+// handle precedence with a PrecClimber in code
+expression = { atom ~ (op ~ atom)* }
+atom = _{ ("(" ~ expression ~ ")") | column_identifier | literal }
+op = _{ greater_equal | less_equal | greater | less | and | or | equal }
+  greater_equal = { ">=" }
+  less_equal = { "<=" }
+  greater = { ">" }
+  less = { "<" }
+  and = { "and" }
+  or = { "or" }
+  equal = { "=" }

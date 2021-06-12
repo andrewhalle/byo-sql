@@ -212,6 +212,7 @@ name = "sql-rs"
 version = "0.1.0"
 dependencies = [
  "ansi_term",
+ "lazy_static",
  "pest",
  "pest_derive",
  "structopt",
