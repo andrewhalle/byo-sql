@@ -188,6 +188,20 @@ enum Value {
     Boolean(bool),
 }
 
+macro_rules! value_op {
+    ($name:ident, $op:tt) => {
+        impl Value {
+            fn $name(&self, rhs: &Value) -> bool {
+                match self {
+                    Value::Text(_) => self.as_str() $op rhs.as_str(),
+                    Value::Number(_) => self.as_number() $op rhs.as_number(),
+                    _ => panic!("operands of $op must be text or number"),
+                }
+            }
+        }
+    };
+}
+
 impl Value {
     fn assignable_to(&self, datatype: Datatype) -> bool {
         match self {
@@ -213,6 +227,11 @@ impl Value {
 
                 Value::Number(num)
             }
+            Rule::boolean_literal => match literal.as_str() {
+                "true" => Value::Boolean(true),
+                "false" => Value::Boolean(false),
+                _ => unreachable!(),
+            },
             _ => unreachable!(),
         }
     }
@@ -223,7 +242,25 @@ impl Value {
             _ => panic!("cannot use a non-boolean Value in a boolean context"),
         }
     }
+
+    fn as_number(&self) -> u32 {
+        match self {
+            Value::Number(n) => *n,
+            _ => panic!(),
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        match self {
+            Value::Text(s) => s.as_str(),
+            _ => panic!(),
+        }
+    }
 }
+value_op!(greater_equal, >=);
+value_op!(greater, >);
+value_op!(less_equal, <=);
+value_op!(less, <);
 
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -544,10 +581,10 @@ impl SelectQueryResult {
                 _ => unreachable!(),
             },
             |lhs: Value, op: Pair<Rule>, rhs: Value| match op.as_rule() {
-                Rule::greater_equal => todo!(),
-                Rule::less_equal => todo!(),
-                Rule::greater => todo!(),
-                Rule::less => todo!(),
+                Rule::greater_equal => Value::Boolean(lhs.greater_equal(&rhs)),
+                Rule::less_equal => Value::Boolean(lhs.less_equal(&rhs)),
+                Rule::greater => Value::Boolean(lhs.greater(&rhs)),
+                Rule::less => Value::Boolean(lhs.less(&rhs)),
                 Rule::and => Value::Boolean(lhs.is_true() && rhs.is_true()),
                 Rule::or => Value::Boolean(lhs.is_true() || rhs.is_true()),
                 Rule::equal => Value::Boolean(lhs == rhs),

@@ -8,9 +8,10 @@ alphanum_or_underscore = { (ASCII_ALPHANUMERIC | "_") }
 // _. a literal is either a number or a string in single quotes
 
 identifier = @{ ASCII_ALPHA ~ alphanum_or_underscore* }
-literal = { number_literal | string_literal }
+literal = { number_literal | string_literal | boolean_literal }
   number_literal = { ASCII_DIGIT+ }
   string_literal = { "'" ~ string_literal_contents ~ "'" }
+  boolean_literal = { "true" | "false" }
 
 // allow for aliasing a table
 
@@ -63,7 +64,7 @@ datatype = { "text" | "number" | "boolean" }
 // work on actual expressions
 // handle precedence with a PrecClimber in code
 expression = { atom ~ (op ~ atom)* }
-atom = _{ ("(" ~ expression ~ ")") | column_identifier | literal }
+atom = _{ ("(" ~ expression ~ ")") | literal | column_identifier }
 op = _{ greater_equal | less_equal | greater | less | and | or | equal }
   greater_equal = { ">=" }
   less_equal = { "<=" }
