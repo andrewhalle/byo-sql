@@ -37,8 +37,11 @@ identifier_list = { identifier ~ ("," ~ identifier)* }
 // specifying the condition to join on
 
 table_expression = { table_identifier ~ join_clause* }
-join_clause = { "join" ~ table_identifier ~ "on" ~ join_filter }
-join_filter = { column_identifier ~ "=" ~ column_identifier }
+join_clause = { join_type ~ table_identifier ~ "on" ~ expression }
+join_type = { inner_join | left_join | right_join }
+  inner_join = { ("inner" ~ "join") | "join" }
+  left_join = { "left" ~ "join" }
+  right_join = { "right" ~ "join" }
 
 // where clauses filter rows out of a select query
 // evaluate the expression, and keep the row if it's true

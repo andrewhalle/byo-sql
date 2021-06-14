@@ -303,29 +303,49 @@ struct TableSelection<'a> {
 
 #[derive(Debug)]
 struct TableJoin<'a> {
+    join_type: JoinType,
     table: TableIdentifier<'a>,
-    first_column: ColumnIdentifier<'a>,
-    second_column: ColumnIdentifier<'a>,
-}
-
-// TODO probably remove this and make a general expression, and turn filtering into a check that
-// the expression, when evaluated against the current result set, is true
-#[derive(Debug)]
-enum Filter<'a> {
-    ColValEq(ColValEq<'a>),
-    ColColEq(ColColEq<'a>),
+    expr: Expression<'a>,
 }
 
 #[derive(Debug)]
-struct ColValEq<'a> {
-    column: ColumnIdentifier<'a>,
-    value: Value,
+enum JoinType {
+    Inner,
+    Left,
+    Right,
 }
 
-#[derive(Debug)]
-struct ColColEq<'a> {
-    first_column: ColumnIdentifier<'a>,
-    second_column: ColumnIdentifier<'a>,
+impl JoinType {
+    fn from(join_type: Pair<'_, Rule>) -> Self {
+        assert_eq!(join_type.as_rule(), Rule::join_type);
+        let join_type = join_type.into_inner().next().unwrap();
+        match join_type.as_rule() {
+            Rule::inner_join => JoinType::Inner,
+            Rule::left_join => JoinType::Left,
+            Rule::right_join => JoinType::Right,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'a> TableJoin<'a> {
+    fn from(join: Pair<'a, Rule>) -> Self {
+        assert_eq!(join.as_rule(), Rule::join_clause);
+
+        let mut inner = join.into_inner();
+
+        let join_type = JoinType::from(inner.next().unwrap());
+        let table = TableIdentifier::from(inner.next().unwrap());
+        let expr = Expression {
+            inner: inner.next().unwrap(),
+        };
+
+        TableJoin {
+            join_type,
+            table,
+            expr,
+        }
+    }
 }
 
 impl<'a> SelectQuery<'a> {
@@ -347,21 +367,7 @@ impl<'a> SelectQuery<'a> {
             let mut joins = Vec::new();
             // remaining tokens are joins
             for join in inner {
-                let mut inner = join.into_inner();
-
-                let table = TableIdentifier::from(inner.next().unwrap());
-
-                let join_filter = inner.next().unwrap();
-                let mut inner = join_filter.into_inner();
-                let first_column = ColumnIdentifier::from(inner.next().unwrap());
-                let second_column = ColumnIdentifier::from(inner.next().unwrap());
-
-                let join = TableJoin {
-                    table,
-                    first_column,
-                    second_column,
-                };
-                joins.push(join);
+                joins.push(TableJoin::from(join));
             }
 
             TableSelection { root_table, joins }
@@ -631,11 +637,10 @@ impl SelectQueryResult {
         }
     }
 
-    // TODO rename this to filter after joins have been converted to use Expression
     // TODO move this to some sort of TableView once it exists.
     /// Filters a SelectQueryResult by evaluating expression for each row, and keeping it if the
     /// expression evaluates to true.
-    fn filter_expression(&mut self, expression: &Expression<'_>) {
+    fn filter(&mut self, expression: &Expression<'_>) {
         // clone the expression
         let mut rows = Vec::new();
         mem::swap(&mut rows, &mut self.rows);
@@ -655,72 +660,78 @@ impl SelectQueryResult {
         }
     }
 
-    // TODO remove this after joins have been converted to use Expression
-    fn filter(&mut self, filter: &Filter<'_>) {
-        match filter {
-            Filter::ColValEq(filter) => {
-                let idx = self
-                    .columns
-                    .iter()
-                    .enumerate()
-                    .find(|(_, c)| {
-                        cmp_column_with_column_identifier(c, &filter.column, &self.table_alias_map)
-                    })
-                    .unwrap()
-                    .0;
+    // TODO nested loop join, considering join.join_type. Probably need to re-write self.evaluate
+    // so that it can work on a row that's not in self yet (since we need to check if we want to
+    // add it).
+    fn join(&mut self, rhs: &mut Self, join: &TableJoin) {
+        let lhs_column_count = self.columns.len();
+        let rhs_column_count = rhs.columns.len();
 
-                let predicate = |row: &Row| row.0[idx] == filter.value;
-
-                let mut rows = Vec::new();
-                mem::swap(&mut rows, &mut self.rows);
-
-                for row in rows.into_iter() {
-                    if predicate(&row) {
-                        self.rows.push(row);
-                    }
-                }
-            }
-            Filter::ColColEq(filter) => {
-                let idx1 = self
-                    .columns
-                    .iter()
-                    .enumerate()
-                    // TODO find correct column according to alias
-                    .find(|(_, c)| &(**c).column == filter.first_column.column)
-                    .unwrap()
-                    .0;
-
-                let idx2 = self
-                    .columns
-                    .iter()
-                    .enumerate()
-                    // TODO find correct column according to alias
-                    .find(|(_, c)| &(**c).column == filter.second_column.column)
-                    .unwrap()
-                    .0;
-
-                let predicate = |row: &Row| row.0[idx1] == row.0[idx2];
-
-                let mut rows = Vec::new();
-                mem::swap(&mut rows, &mut self.rows);
-
-                for row in rows.into_iter() {
-                    if predicate(&row) {
-                        self.rows.push(row);
-                    }
-                }
-            }
-        }
-    }
-
-    fn cartesian_product(&mut self, mut rhs: Self) {
         self.columns.append(&mut rhs.columns);
+
+        let outer_iter = || match join.join_type {
+            JoinType::Right => rhs.rows.iter(),
+            _ => self.rows.iter(),
+        };
+        let inner_iter = || match join.join_type {
+            JoinType::Right => self.rows.iter(),
+            _ => rhs.rows.iter(),
+        };
+
         let mut rows = Vec::new();
-        for i in self.rows.iter() {
-            for j in rhs.rows.iter() {
+        for i in outer_iter() {
+            let mut did_add_row = false;
+
+            for j in inner_iter() {
                 let mut row = i.0.clone();
                 row.append(&mut j.0.clone());
-                rows.push(Row(row));
+                let row = Row(row);
+                if self
+                    .evaluate(
+                        Expression {
+                            inner: join.expr.inner.clone(),
+                        },
+                        &row,
+                    )
+                    .is_true()
+                {
+                    rows.push(row);
+                    did_add_row = true;
+                }
+            }
+
+            if !did_add_row {
+                let row = match join.join_type {
+                    JoinType::Left => {
+                        let mut row = i.0.clone();
+                        let mut nulls = {
+                            let mut nulls = Vec::with_capacity(rhs_column_count);
+                            for _i in 0..rhs_column_count {
+                                nulls.push(Value::Null);
+                            }
+                            nulls
+                        };
+                        row.append(&mut nulls);
+                        Some(Row(row))
+                    }
+                    JoinType::Right => {
+                        let mut row = i.0.clone();
+                        let mut nulls = {
+                            let mut nulls = Vec::with_capacity(lhs_column_count);
+                            for _i in 0..lhs_column_count {
+                                nulls.push(Value::Null);
+                            }
+                            nulls
+                        };
+                        nulls.append(&mut row);
+                        Some(Row(nulls))
+                    }
+                    _ => None,
+                };
+
+                if row.is_some() {
+                    rows.push(row.unwrap());
+                }
             }
         }
         mem::swap(&mut self.rows, &mut rows);
@@ -799,7 +810,7 @@ impl Database {
 
                 for join in query.table.joins {
                     let table = self.find_table(join.table.name);
-                    let term = SelectQueryResult {
+                    let mut table = SelectQueryResult {
                         columns: table
                             .columns
                             .iter()
@@ -808,16 +819,11 @@ impl Database {
                         rows: table.rows.clone(),
                         table_alias_map: new_alias_map(&join.table),
                     };
-                    result.cartesian_product(term);
-                    let filter = Filter::ColColEq(ColColEq {
-                        first_column: join.first_column,
-                        second_column: join.second_column,
-                    });
-                    result.filter(&filter);
+                    result.join(&mut table, &join);
                 }
 
                 if let Some(filter) = &query.filter {
-                    result.filter_expression(filter);
+                    result.filter(filter);
                 }
 
                 result.select(query.select_list);
