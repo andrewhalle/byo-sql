@@ -29,7 +29,7 @@ query = { (select_query | insert_query | create_table_query) ~ ";" }
 
 // select queries, get data from the database
 
-select_query = { "select" ~ column_list ~ "from" ~ table_expression ~ where_clause? }
+select_query = { "select" ~ column_list ~ "from" ~ table_expression ~ where_clause? ~ order_by_clause? }
 column_list = { ( column_identifier ~ ("," ~ column_identifier)* ) | "*" }
 identifier_list = { identifier ~ ("," ~ identifier)* }
 
@@ -47,6 +47,11 @@ join_type = { inner_join | left_join | right_join }
 // evaluate the expression, and keep the row if it's true
 
 where_clause = { "where" ~ expression }
+
+// order by clauses order the result
+
+order_by_clause = { "order" ~ "by" ~ expression ~ direction? }
+direction = { "asc" | "desc" }
 
 // insert queries, insert a single row into the database with a list of literal
 // values.
@@ -73,6 +78,7 @@ op = _{ greater_equal | less_equal | greater | less | and | or | equal }
   less_equal = { "<=" }
   greater = { ">" }
   less = { "<" }
-  and = { "and" }
-  or = { "or" }
+  // and and or are possible prefixes to other words, so they better be surrounded by whitespace
+  and = { WHITESPACE ~ "and" ~ WHITESPACE}
+  or = { WHITESPACE ~ "or" ~ WHITESPACE }
   equal = { "=" }

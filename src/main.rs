@@ -1,3 +1,4 @@
+use std::cmp::{Ordering, Reverse};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::fs;
@@ -179,13 +180,48 @@ impl Datatype {
     }
 }
 
+// TODO remove PartialEq and Eq
 // TODO this and Datatype are very similar
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Value {
     Null,
     Number(u32),
     Text(String),
     Boolean(bool),
+}
+
+#[derive(PartialEq, Eq)]
+struct SortableValue(Value);
+
+impl Ord for SortableValue {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match &self.0 {
+            Value::Null => match &other.0 {
+                Value::Null => Ordering::Equal,
+                _ => Ordering::Less,
+            },
+            Value::Number(n1) => match &other.0 {
+                Value::Null => Ordering::Greater,
+                Value::Number(n2) => n1.cmp(&n2),
+                _ => Ordering::Less,
+            },
+            Value::Text(s1) => match &other.0 {
+                Value::Null | Value::Number(_) => Ordering::Greater,
+                Value::Text(s2) => s1.cmp(&s2),
+                _ => Ordering::Less,
+            },
+            Value::Boolean(b1) => match &other.0 {
+                Value::Null | Value::Number(_) | Value::Text(_) => Ordering::Greater,
+                Value::Boolean(b2) => b1.cmp(&b2),
+            },
+        }
+    }
+}
+
+impl PartialOrd for SortableValue {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 macro_rules! value_op {
@@ -288,6 +324,19 @@ struct SelectQuery<'a> {
     select_list: Vec<ColumnIdentifier<'a>>,
     table: TableSelection<'a>,
     filter: Option<Expression<'a>>,
+    sort: Option<SortClause<'a>>,
+}
+
+#[derive(Debug)]
+struct SortClause<'a> {
+    expression: Expression<'a>,
+    direction: SortDirection,
+}
+
+#[derive(Debug)]
+enum SortDirection {
+    Asc,
+    Desc,
 }
 
 #[derive(Debug)]
@@ -377,6 +426,7 @@ impl<'a> SelectQuery<'a> {
             select_list,
             table,
             filter: None,
+            sort: None,
         };
 
         loop {
@@ -388,6 +438,24 @@ impl<'a> SelectQuery<'a> {
                         let expression = inner.next().unwrap();
 
                         retval.filter = Some(Expression { inner: expression });
+                    }
+                    Rule::order_by_clause => {
+                        let mut inner = tree.into_inner();
+                        let expression = Expression {
+                            inner: inner.next().unwrap(),
+                        };
+                        let direction = {
+                            let inner = inner.next().map(|p| p.as_str());
+                            match inner {
+                                Some("desc") => SortDirection::Desc,
+                                _ => SortDirection::Asc,
+                            }
+                        };
+
+                        retval.sort = Some(SortClause {
+                            expression,
+                            direction,
+                        });
                     }
                     _ => unreachable!(),
                 }
@@ -641,7 +709,6 @@ impl SelectQueryResult {
     /// Filters a SelectQueryResult by evaluating expression for each row, and keeping it if the
     /// expression evaluates to true.
     fn filter(&mut self, expression: &Expression<'_>) {
-        // clone the expression
         let mut rows = Vec::new();
         mem::swap(&mut rows, &mut self.rows);
 
@@ -656,6 +723,40 @@ impl SelectQueryResult {
                 .is_true()
             {
                 self.rows.push(row);
+            }
+        }
+    }
+
+    // TODO move this to some sort of TableView once it exists.
+    /// Sorts the rows in a SelectQueryResult by evaluating expression and using it as a key.
+    fn sort(&mut self, sort_clause: &SortClause<'_>) {
+        let this = self as *const SelectQueryResult;
+
+        // TODO this is safe because evaluating requires immutable access to fields of self which
+        // are not borrowed mutably (e.g. not rows), re-organize the parameters of methods to
+        // accomodate this, or make a method for splitting this struct into separate borrows
+        match sort_clause.direction {
+            SortDirection::Asc => {
+                self.rows.as_mut_slice().sort_unstable_by_key(|row| unsafe {
+                    SortableValue(SelectQueryResult::evaluate(
+                        &*this,
+                        Expression {
+                            inner: sort_clause.expression.inner.clone(),
+                        },
+                        &row,
+                    ))
+                });
+            }
+            SortDirection::Desc => {
+                self.rows.as_mut_slice().sort_unstable_by_key(|row| unsafe {
+                    Reverse(SortableValue(SelectQueryResult::evaluate(
+                        &*this,
+                        Expression {
+                            inner: sort_clause.expression.inner.clone(),
+                        },
+                        &row,
+                    )))
+                });
             }
         }
     }
@@ -824,6 +925,10 @@ impl Database {
 
                 if let Some(filter) = &query.filter {
                     result.filter(filter);
+                }
+
+                if let Some(sort) = &query.sort {
+                    result.sort(sort);
                 }
 
                 result.select(query.select_list);
