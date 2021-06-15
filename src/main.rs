@@ -521,7 +521,7 @@ enum QueryResult {
     CreateTableQueryResult(CreateTableQueryResult),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct SelectQueryResultColumn {
     table: String,
     column: String,
@@ -668,6 +668,9 @@ impl SelectQueryResult {
         let rhs_column_count = rhs.columns.len();
 
         self.columns.append(&mut rhs.columns);
+        for (k, v) in rhs.table_alias_map.drain() {
+            self.table_alias_map.insert(k, v);
+        }
 
         let outer_iter = || match join.join_type {
             JoinType::Right => rhs.rows.iter(),
@@ -735,9 +738,6 @@ impl SelectQueryResult {
             }
         }
         mem::swap(&mut self.rows, &mut rows);
-        for (k, v) in rhs.table_alias_map.drain() {
-            self.table_alias_map.insert(k, v);
-        }
     }
 }
 
