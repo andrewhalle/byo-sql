@@ -78,7 +78,7 @@ op = _{ greater_equal | less_equal | greater | less | and | or | equal }
   less_equal = { "<=" }
   greater = { ">" }
   less = { "<" }
-  // and and or are possible prefixes to other words, so they better be surrounded by whitespace
-  and = { WHITESPACE ~ "and" ~ WHITESPACE}
-  or = { WHITESPACE ~ "or" ~ WHITESPACE }
+  // and and or are possible prefixes to other words, so they better be followed by whitespace
+  and = @{ "and" ~ WHITESPACE }
+  or = @{ "or" ~ WHITESPACE }
   equal = { "=" }
