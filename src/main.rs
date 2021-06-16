@@ -325,6 +325,7 @@ struct SelectQuery<'a> {
     table: TableSelection<'a>,
     filter: Option<Expression<'a>>,
     sort: Option<SortClause<'a>>,
+    limit: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -427,6 +428,7 @@ impl<'a> SelectQuery<'a> {
             table,
             filter: None,
             sort: None,
+            limit: None,
         };
 
         loop {
@@ -456,6 +458,12 @@ impl<'a> SelectQuery<'a> {
                             expression,
                             direction,
                         });
+                    }
+                    Rule::limit_clause => {
+                        let mut inner = tree.into_inner();
+                        let rows = inner.next().unwrap().as_str().parse().unwrap();
+
+                        retval.limit = Some(rows);
                     }
                     _ => unreachable!(),
                 }
@@ -761,6 +769,10 @@ impl SelectQueryResult {
         }
     }
 
+    fn limit(&mut self, rows: u32) {
+        self.rows.truncate(rows as usize);
+    }
+
     // TODO nested loop join, considering join.join_type. Probably need to re-write self.evaluate
     // so that it can work on a row that's not in self yet (since we need to check if we want to
     // add it).
@@ -929,6 +941,10 @@ impl Database {
 
                 if let Some(sort) = &query.sort {
                     result.sort(sort);
+                }
+
+                if let Some(rows) = &query.limit {
+                    result.limit(*rows);
                 }
 
                 result.select(query.select_list);

@@ -29,7 +29,12 @@ query = { (select_query | insert_query | create_table_query) ~ ";" }
 
 // select queries, get data from the database
 
-select_query = { "select" ~ column_list ~ "from" ~ table_expression ~ where_clause? ~ order_by_clause? }
+select_query = {
+  "select" ~ column_list ~ "from" ~ table_expression
+    ~ where_clause?
+    ~ order_by_clause?
+    ~ limit_clause?
+}
 column_list = { ( column_identifier ~ ("," ~ column_identifier)* ) | "*" }
 identifier_list = { identifier ~ ("," ~ identifier)* }
 
@@ -52,6 +57,8 @@ where_clause = { "where" ~ expression }
 
 order_by_clause = { "order" ~ "by" ~ expression ~ direction? }
 direction = { "asc" | "desc" }
+
+limit_clause = { "limit" ~ number_literal }
 
 // insert queries, insert a single row into the database with a list of literal
 // values.
