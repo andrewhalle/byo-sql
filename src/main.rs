@@ -193,6 +193,7 @@ enum Value {
 #[derive(PartialEq, Eq)]
 struct SortableValue(Value);
 
+// TODO can this implementation be derived?
 impl Ord for SortableValue {
     fn cmp(&self, other: &Self) -> Ordering {
         match &self.0 {
@@ -626,6 +627,12 @@ struct InsertQueryResult {
 
 struct CreateTableQueryResult;
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum OrdVariants {
+    SortableValue(SortableValue),
+    Reversed(Reverse<SortableValue>),
+}
+
 impl SelectQueryResult {
     // TODO should this clone?
     fn get_column_value_from_row(
@@ -738,35 +745,23 @@ impl SelectQueryResult {
     // TODO move this to some sort of TableView once it exists.
     /// Sorts the rows in a SelectQueryResult by evaluating expression and using it as a key.
     fn sort(&mut self, sort_clause: &SortClause<'_>) {
-        let this = self as *const SelectQueryResult;
+        let mut rows = mem::take(&mut self.rows);
 
-        // TODO this is safe because evaluating requires immutable access to fields of self which
-        // are not borrowed mutably (e.g. not rows), re-organize the parameters of methods to
-        // accomodate this, or make a method for splitting this struct into separate borrows
-        match sort_clause.direction {
-            SortDirection::Asc => {
-                self.rows.as_mut_slice().sort_unstable_by_key(|row| unsafe {
-                    SortableValue(SelectQueryResult::evaluate(
-                        &*this,
-                        Expression {
-                            inner: sort_clause.expression.inner.clone(),
-                        },
-                        &row,
-                    ))
-                });
+        rows.as_mut_slice().sort_unstable_by_key(|row| {
+            let sortable = SortableValue(self.evaluate(
+                Expression {
+                    inner: sort_clause.expression.inner.clone(),
+                },
+                &row,
+            ));
+
+            match sort_clause.direction {
+                SortDirection::Asc => OrdVariants::SortableValue(sortable),
+                SortDirection::Desc => OrdVariants::Reversed(Reverse(sortable)),
             }
-            SortDirection::Desc => {
-                self.rows.as_mut_slice().sort_unstable_by_key(|row| unsafe {
-                    Reverse(SortableValue(SelectQueryResult::evaluate(
-                        &*this,
-                        Expression {
-                            inner: sort_clause.expression.inner.clone(),
-                        },
-                        &row,
-                    )))
-                });
-            }
-        }
+        });
+
+        mem::swap(&mut rows, &mut self.rows);
     }
 
     fn limit(&mut self, rows: u32) {
