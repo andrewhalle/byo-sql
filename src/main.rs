@@ -322,7 +322,7 @@ enum Query<'a> {
 
 #[derive(Debug)]
 struct SelectQuery<'a> {
-    select_list: Vec<ColumnIdentifier<'a>>,
+    select_list: Vec<Expression<'a>>,
     table: TableSelection<'a>,
     filter: Option<Expression<'a>>,
     sort: Option<SortClause<'a>>,
@@ -406,7 +406,10 @@ impl<'a> SelectQuery<'a> {
         let select_list = inner.next().unwrap();
         let select_list = {
             let inner: Vec<_> = select_list.into_inner().collect();
-            inner.into_iter().map(ColumnIdentifier::from).collect()
+            inner
+                .into_iter()
+                .map(|val| Expression { inner: val })
+                .collect()
         };
 
         let table = {
@@ -640,6 +643,8 @@ impl SelectQueryResult {
         column_identifier: ColumnIdentifier<'_>,
         row: &Row,
     ) -> Value {
+        assert_ne!(column_identifier.column, "*");
+
         let idx = self
             .columns
             .iter()
@@ -682,9 +687,8 @@ impl SelectQueryResult {
         )
     }
 
-    fn select(&mut self, columns: Vec<ColumnIdentifier<'_>>) {
-        // TODO make this work with multiple "*" (e.g. "select *, * from test;"), probably get rid
-        // of the length check altogether
+    fn select(&mut self, select_list: Vec<Expression<'_>>) -> Self {
+        /*
         if columns.len() == 1 && columns[0].column == "*" {
             return;
         } else {
@@ -718,6 +722,46 @@ impl SelectQueryResult {
 
             return;
         }
+        */
+        let mut retval = SelectQueryResult {
+            columns: Vec::new(),
+            rows: Vec::new(),
+            table_alias_map: HashMap::new(),
+        };
+
+        // TODO functions likely needed
+        //   * get column description from expression
+        //   * get type of expression
+        // push columns
+        for expr in &select_list {
+            // TODO broke '*'
+            let column_identifier =
+                ColumnIdentifier::from(expr.inner.clone().into_inner().next().unwrap());
+            let column = self
+                .columns
+                .iter()
+                .find(|x| {
+                    cmp_column_with_column_identifier(x, &column_identifier, &self.table_alias_map)
+                })
+                .unwrap();
+            retval.columns.push(column.clone());
+        }
+
+        // push projected rows
+        for row in &self.rows {
+            let mut new_row = Vec::new();
+            for expr in &select_list {
+                new_row.push(self.evaluate(
+                    Expression {
+                        inner: expr.inner.clone(),
+                    },
+                    row,
+                ));
+            }
+            retval.rows.push(Row(new_row));
+        }
+
+        retval
     }
 
     // TODO move this to some sort of TableView once it exists.
@@ -942,7 +986,7 @@ impl Database {
                     result.limit(*rows);
                 }
 
-                result.select(query.select_list);
+                let result = result.select(query.select_list);
 
                 QueryResult::SelectQueryResult(result)
             }
