@@ -71,9 +71,12 @@ fn cmp_column_with_column_identifier(
     c2: &ColumnIdentifier<'_>,
     table_alias_map: &HashMap<String, String>,
 ) -> bool {
+    let is_star = c2.column == "*";
+    let names_match = c1.column == c2.column || is_star;
+
     match c2.alias {
-        None => c1.column == c2.column,
-        Some(alias) => &c1.table == table_alias_map.get(alias).unwrap() && c1.column == c2.column,
+        None => names_match,
+        Some(alias) => &c1.table == table_alias_map.get(alias).unwrap() && names_match,
     }
 }
 
@@ -344,6 +347,19 @@ enum SortDirection {
 #[derive(Debug)]
 struct Expression<'a> {
     inner: Pair<'a, Rule>,
+}
+
+impl<'a> Expression<'a> {
+    fn is_column_star(&self) -> bool {
+        let first = self.inner.clone().into_inner().next().unwrap();
+        match first.as_rule() {
+            Rule::column_identifier => {
+                let column_identifier = ColumnIdentifier::from(first);
+                column_identifier.column == "*"
+            }
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -688,41 +704,6 @@ impl SelectQueryResult {
     }
 
     fn select(&mut self, select_list: Vec<Expression<'_>>) -> Self {
-        /*
-        if columns.len() == 1 && columns[0].column == "*" {
-            return;
-        } else {
-            let indices: Vec<usize> = columns
-                .iter()
-                .map(|c| {
-                    self.columns
-                        .iter()
-                        .enumerate()
-                        .find(|(_, x)| {
-                            cmp_column_with_column_identifier(x, c, &self.table_alias_map)
-                        })
-                        .unwrap()
-                        .0
-                })
-                .collect();
-
-            let mut new_columns = Vec::new();
-            for i in indices.iter() {
-                new_columns.push(self.columns[*i].clone());
-            }
-            self.columns = new_columns;
-
-            for row in self.rows.iter_mut() {
-                let mut new_row = Vec::new();
-                for i in indices.iter() {
-                    new_row.push(row.0[*i].clone());
-                }
-                *row = Row(new_row);
-            }
-
-            return;
-        }
-        */
         let mut retval = SelectQueryResult {
             columns: Vec::new(),
             rows: Vec::new(),
@@ -734,29 +715,59 @@ impl SelectQueryResult {
         //   * get type of expression
         // push columns
         for expr in &select_list {
-            // TODO broke '*'
             let column_identifier =
                 ColumnIdentifier::from(expr.inner.clone().into_inner().next().unwrap());
-            let column = self
-                .columns
-                .iter()
-                .find(|x| {
-                    cmp_column_with_column_identifier(x, &column_identifier, &self.table_alias_map)
-                })
-                .unwrap();
-            retval.columns.push(column.clone());
+
+            if let "*" = column_identifier.column {
+                for column in &self.columns {
+                    if cmp_column_with_column_identifier(
+                        column,
+                        &column_identifier,
+                        &self.table_alias_map,
+                    ) {
+                        retval.columns.push(column.clone());
+                    }
+                }
+            } else {
+                let column = self
+                    .columns
+                    .iter()
+                    .find(|x| {
+                        cmp_column_with_column_identifier(
+                            x,
+                            &column_identifier,
+                            &self.table_alias_map,
+                        )
+                    })
+                    .unwrap();
+                retval.columns.push(column.clone());
+            }
         }
 
         // push projected rows
         for row in &self.rows {
             let mut new_row = Vec::new();
             for expr in &select_list {
-                new_row.push(self.evaluate(
-                    Expression {
-                        inner: expr.inner.clone(),
-                    },
-                    row,
-                ));
+                if expr.is_column_star() {
+                    let column_identifier =
+                        ColumnIdentifier::from(expr.inner.clone().into_inner().next().unwrap());
+                    for (i, column) in self.columns.iter().enumerate() {
+                        if cmp_column_with_column_identifier(
+                            column,
+                            &column_identifier,
+                            &self.table_alias_map,
+                        ) {
+                            new_row.push(row.0[i].clone());
+                        }
+                    }
+                } else {
+                    new_row.push(self.evaluate(
+                        Expression {
+                            inner: expr.inner.clone(),
+                        },
+                        row,
+                    ));
+                }
             }
             retval.rows.push(Row(new_row));
         }
