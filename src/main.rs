@@ -360,6 +360,10 @@ impl<'a> Expression<'a> {
             _ => false,
         }
     }
+
+    fn is_count(&self) -> bool {
+        self.inner.clone().into_inner().next().unwrap().as_rule() == Rule::count_star
+    }
 }
 
 #[derive(Debug)]
@@ -715,6 +719,15 @@ impl SelectQueryResult {
         //   * get type of expression
         // push columns
         for expr in &select_list {
+            if expr.is_count() {
+                retval.columns.push(SelectQueryResultColumn {
+                    table: "".to_string(),
+                    column: "count".to_string(),
+                    datatype: Datatype::Number,
+                });
+                break;
+            }
+
             let column_identifier =
                 ColumnIdentifier::from(expr.inner.clone().into_inner().next().unwrap());
 
@@ -745,31 +758,37 @@ impl SelectQueryResult {
         }
 
         // push projected rows
-        for row in &self.rows {
-            let mut new_row = Vec::new();
-            for expr in &select_list {
-                if expr.is_column_star() {
-                    let column_identifier =
-                        ColumnIdentifier::from(expr.inner.clone().into_inner().next().unwrap());
-                    for (i, column) in self.columns.iter().enumerate() {
-                        if cmp_column_with_column_identifier(
-                            column,
-                            &column_identifier,
-                            &self.table_alias_map,
-                        ) {
-                            new_row.push(row.0[i].clone());
+        if select_list[0].is_count() {
+            let mut row = Vec::new();
+            row.push(Value::Number(self.rows.len() as u32));
+            retval.rows.push(Row(row));
+        } else {
+            for row in &self.rows {
+                let mut new_row = Vec::new();
+                for expr in &select_list {
+                    if expr.is_column_star() {
+                        let column_identifier =
+                            ColumnIdentifier::from(expr.inner.clone().into_inner().next().unwrap());
+                        for (i, column) in self.columns.iter().enumerate() {
+                            if cmp_column_with_column_identifier(
+                                column,
+                                &column_identifier,
+                                &self.table_alias_map,
+                            ) {
+                                new_row.push(row.0[i].clone());
+                            }
                         }
+                    } else {
+                        new_row.push(self.evaluate(
+                            Expression {
+                                inner: expr.inner.clone(),
+                            },
+                            row,
+                        ));
                     }
-                } else {
-                    new_row.push(self.evaluate(
-                        Expression {
-                            inner: expr.inner.clone(),
-                        },
-                        row,
-                    ));
                 }
+                retval.rows.push(Row(new_row));
             }
-            retval.rows.push(Row(new_row));
         }
 
         retval
