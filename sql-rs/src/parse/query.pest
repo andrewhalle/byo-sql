@@ -1,7 +1,7 @@
 // preliminaries, random small character utilities
 WHITESPACE = _{ " " | "\n" }
 non_single_quote = _{ !"'" ~ ANY }
-string_literal_contents = { ("\\'" | non_single_quote)+ }
+string_literal_contents = { ("\\'" | non_single_quote)* }
 alphanum_or_underscore = { (ASCII_ALPHANUMERIC | "_") }
 
 // atoms, an identifier doesn't start with a number, and then is alphanumeric +
