@@ -18,6 +18,9 @@ pub use column::*;
 mod column_identifier;
 pub use column_identifier::*;
 
+mod query;
+pub use query::*;
+
 // Template
 // /// <Quick description.>
 // ///
