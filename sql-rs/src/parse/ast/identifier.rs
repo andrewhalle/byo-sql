@@ -9,9 +9,9 @@ use pest::iterators::Pair;
 use crate::parse::Rule;
 
 impl<'input> From<Pair<'input, Rule>> for Identifier<'input> {
-    fn from(pair: Pair<'input, Rule>) -> Self {
-        assert_eq!(pair.as_rule(), Rule::identifier);
+    fn from(identifier: Pair<'input, Rule>) -> Self {
+        assert_eq!(identifier.as_rule(), Rule::identifier);
 
-        Identifier(pair.as_str())
+        Identifier(identifier.as_str())
     }
 }
