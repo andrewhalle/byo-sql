@@ -4,9 +4,8 @@
 #[derive(Debug)]
 pub struct Identifier<'input>(pub &'input str);
 
-use pest::iterators::Pair;
-
 use crate::parse::Rule;
+use pest::iterators::Pair;
 
 impl<'input> From<Pair<'input, Rule>> for Identifier<'input> {
     fn from(identifier: Pair<'input, Rule>) -> Self {

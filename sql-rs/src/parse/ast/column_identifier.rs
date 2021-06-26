@@ -10,9 +10,8 @@ pub struct ColumnIdentifier<'input> {
     name: Column<'input>,
 }
 
-use pest::iterators::Pair;
-
 use crate::parse::Rule;
+use pest::iterators::Pair;
 
 impl<'input> From<Pair<'input, Rule>> for ColumnIdentifier<'input> {
     fn from(column_identifier: Pair<'input, Rule>) -> Self {

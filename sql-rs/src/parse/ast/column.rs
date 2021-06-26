@@ -7,9 +7,8 @@ pub enum Column<'input> {
     Ident(Identifier<'input>),
 }
 
-use pest::iterators::Pair;
-
 use crate::parse::Rule;
+use pest::iterators::Pair;
 
 impl<'input> From<Pair<'input, Rule>> for Column<'input> {
     fn from(column: Pair<'input, Rule>) -> Self {

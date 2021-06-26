@@ -25,8 +25,8 @@ pub use column_identifier::*;
 // #[derive(Debug)]
 // pub <decl>
 //
-// use pest::iterators::Pair;
 // use crate::parse::Rule;
+// use pest::iterators::Pair;
 //
 // impl<'input> From<Pair<'input, Rule>> for <name><'input> {
 //     fn from(<name>: Pair<'input, Rule>) -> Self {

@@ -10,9 +10,8 @@ pub struct TableIdentifier<'input> {
     alias: Option<Identifier<'input>>,
 }
 
-use pest::iterators::Pair;
-
 use crate::parse::Rule;
+use pest::iterators::Pair;
 
 impl<'input> From<Pair<'input, Rule>> for TableIdentifier<'input> {
     fn from(table_identifier: Pair<'input, Rule>) -> Self {
