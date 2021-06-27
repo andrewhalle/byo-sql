@@ -1,9 +1,11 @@
+use super::SelectList;
+
 /// TODO quick description.
 ///
 /// TODO long description.
 #[derive(Debug)]
 struct SelectQuery<'input> {
-    select_list: Vec<Expression<'input>>,
+    select_list: SelectList<'input>,
     table: TableSelection<'input>,
     filter: Option<Expression<'input>>,
     sort: Option<SortClause<'input>>,

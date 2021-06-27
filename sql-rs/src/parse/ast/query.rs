@@ -1,12 +1,7 @@
 // TODO
-// mod create_table_query;
-// use create_table_query::*;
-//
-// mod insert_query;
-// use insert_query::*;
-
-mod select_query;
-use select_query::*;
+// use super::CreateTableQuery;
+// use super::InsertQuery;
+use super::SelectQuery;
 
 /// The root of the AST, representing a single query.
 ///
@@ -33,12 +28,13 @@ impl<'input> From<Pair<'input, Rule>> for Query<'input> {
     }
 }
 
+#[derive(Debug)]
 pub struct Queries<'input>(Vec<Query<'input>>);
 
 impl<'input> From<Pair<'input, Rule>> for Queries<'input> {
     fn from(queries: Pair<'input, Rule>) -> Self {
         assert_eq!(queries.as_rule(), Rule::queries);
 
-        Queries(queries.into_inner().map(<Query<'input as From<Pair<'input, Rule>>>>::from).collect())
+        Queries(queries.into_inner().map(From::from).collect())
     }
 }
