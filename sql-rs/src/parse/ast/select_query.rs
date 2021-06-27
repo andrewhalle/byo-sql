@@ -1,14 +1,15 @@
-use super::SelectList;
+use super::{Expression, Literal, SelectList, TableExpression};
 
 /// TODO quick description.
 ///
 /// TODO long description.
 #[derive(Debug)]
-struct SelectQuery<'input> {
+pub struct SelectQuery<'input> {
     select_list: SelectList<'input>,
-    table: TableSelection<'input>,
+    // table: TableExpression<'input>,
+    table: TableExpression,
     filter: Option<Expression<'input>>,
-    sort: Option<SortClause<'input>>,
+    sort: Option<Expression<'input>>,
     limit: Option<Literal<'input>>,
 }
 
@@ -21,19 +22,20 @@ impl<'input> From<Pair<'input, Rule>> for SelectQuery<'input> {
 
         let mut inner = select_query.into_inner();
 
-        let select_list = inner.next().into();
-        let table = inner.next().into();
-        let filter = None;
-        let sort = None;
-        let limit = None;
+        let select_list = inner.next().unwrap().into();
+        let table = inner.next().unwrap().into();
+        let mut filter = None;
+        let mut sort = None;
+        let mut limit = None;
 
         loop {
             let pair = inner.next();
             match pair {
                 Some(pair) => match pair.as_rule() {
-                    Rule::where_clause => filter = pair.into(),
+                    Rule::where_clause => filter = Some(pair.into()),
                     Rule::order_by_clause => sort = Some(pair.into()),
                     Rule::limit_clause => limit = Some(pair.into()),
+                    _ => unreachable!(),
                 },
                 None => break,
             }

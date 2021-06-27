@@ -22,8 +22,9 @@ impl<'input> From<Pair<'input, Rule>> for Query<'input> {
 
         let mut inner = query.into_inner();
         let query = inner.next().unwrap();
-        match first.as_rule() {
+        match query.as_rule() {
             Rule::select_query => Query::SelectQuery(query.into()),
+            _ => unreachable!(),
         }
     }
 }

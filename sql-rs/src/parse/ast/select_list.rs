@@ -13,6 +13,6 @@ impl<'input> From<Pair<'input, Rule>> for SelectList<'input> {
     fn from(select_list: Pair<'input, Rule>) -> Self {
         assert_eq!(select_list.as_rule(), Rule::select_list);
 
-        select_list.into_inner().map(From::from).collect()
+        SelectList(select_list.into_inner().map(From::from).collect())
     }
 }

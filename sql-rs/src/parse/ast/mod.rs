@@ -27,6 +27,12 @@ pub use select_query::*;
 mod select_list;
 pub use select_list::*;
 
+mod expression;
+pub use expression::*;
+
+mod table_expression;
+pub use table_expression::*;
+
 // Template
 // /// <Quick description.>
 // ///
