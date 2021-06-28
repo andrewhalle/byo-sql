@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 
 use pest::prec_climber::{Operator, PrecClimber};
 
-use super::{ColumnIdentifier, Literal};
+use super::{ColumnIdentifier, Listable, Literal};
 
 /// An expression that can be evaluated.
 ///
@@ -113,33 +113,8 @@ impl From<Pair<'_, Rule>> for ExpressionOp {
     }
 }
 
-/*
-   fn evaluate(&self, expr: Expression<'_>, row: &Row) -> Value {
-       PREC_CLIMBER.climb(
-           expr.inner.into_inner(),
-           |pair: Pair<Rule>| match pair.as_rule() {
-               Rule::column_identifier => {
-                   self.get_column_value_from_row(ColumnIdentifier::from(pair), row)
-               }
-               Rule::expression => self.evaluate(
-                   Expression {
-                       inner: pair.clone(),
-                   },
-                   row,
-               ),
-               Rule::literal => Value::from(pair),
-               _ => unreachable!(),
-           },
-           |lhs: Value, op: Pair<Rule>, rhs: Value| match op.as_rule() {
-               Rule::greater_equal => Value::Boolean(lhs.greater_equal(&rhs)),
-               Rule::less_equal => Value::Boolean(lhs.less_equal(&rhs)),
-               Rule::greater => Value::Boolean(lhs.greater(&rhs)),
-               Rule::less => Value::Boolean(lhs.less(&rhs)),
-               Rule::and => Value::Boolean(lhs.is_true() && rhs.is_true()),
-               Rule::or => Value::Boolean(lhs.is_true() || rhs.is_true()),
-               Rule::equal => Value::Boolean(lhs == rhs),
-               _ => unreachable!(),
-           },
-       )
-   }
-*/
+impl<'input> Listable for Expression<'input> {
+    fn get_rule() -> Rule {
+        Rule::expression_list
+    }
+}

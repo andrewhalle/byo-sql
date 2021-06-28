@@ -1,3 +1,5 @@
+use super::Listable;
+
 /// A literal value.
 ///
 /// Possible literals are string literals, number literals, and boolean literals.
@@ -27,5 +29,11 @@ impl<'input> From<Pair<'input, Rule>> for Literal<'input> {
             Rule::boolean_literal => Literal::Boolean(inner_literal.as_str()),
             _ => unreachable!(),
         }
+    }
+}
+
+impl<'input> Listable for Literal<'input> {
+    fn get_rule() -> Rule {
+        Rule::literal_list
     }
 }

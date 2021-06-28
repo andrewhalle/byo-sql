@@ -1,3 +1,5 @@
+use super::Listable;
+
 /// An identifier.
 ///
 /// Used for either a table name, a column name, or an alias.
@@ -12,5 +14,11 @@ impl<'input> From<Pair<'input, Rule>> for Identifier<'input> {
         assert_eq!(identifier.as_rule(), Rule::identifier);
 
         Identifier(identifier.as_str())
+    }
+}
+
+impl<'input> Listable for Identifier<'input> {
+    fn get_rule() -> Rule {
+        Rule::identifier_list
     }
 }

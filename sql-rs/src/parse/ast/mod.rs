@@ -24,9 +24,6 @@ pub use query::*;
 mod select_query;
 pub use select_query::*;
 
-mod select_list;
-pub use select_list::*;
-
 mod expression;
 pub use expression::*;
 
@@ -38,6 +35,12 @@ pub use join::*;
 
 mod order_by;
 pub use order_by::*;
+
+mod insert_query;
+pub use insert_query::*;
+
+mod list;
+pub use list::*;
 
 // Template
 // /// <Quick description.>

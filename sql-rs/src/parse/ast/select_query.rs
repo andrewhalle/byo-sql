@@ -1,11 +1,11 @@
-use super::{Expression, OrderBy, SelectList, TableExpression};
+use super::{Expression, List, OrderBy, TableExpression};
 
 /// TODO quick description.
 ///
 /// TODO long description.
 #[derive(Debug)]
 pub struct SelectQuery<'input> {
-    select_list: SelectList<'input>,
+    select_list: Vec<Expression<'input>>,
     table: TableExpression<'input>,
     filter: Option<Expression<'input>>,
     sort: Option<OrderBy<'input>>,
@@ -21,7 +21,7 @@ impl<'input> From<Pair<'input, Rule>> for SelectQuery<'input> {
 
         let mut inner = select_query.into_inner();
 
-        let select_list = inner.next().unwrap().into();
+        let select_list: List<Expression<'input>> = inner.next().unwrap().into();
         let table = inner.next().unwrap().into();
         let mut filter = None;
         let mut sort = None;
@@ -41,7 +41,7 @@ impl<'input> From<Pair<'input, Rule>> for SelectQuery<'input> {
         }
 
         SelectQuery {
-            select_list,
+            select_list: select_list.0,
             table,
             filter,
             sort,

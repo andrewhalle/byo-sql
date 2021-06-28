@@ -30,13 +30,14 @@ query = { (select_query | insert_query | create_table_query) ~ ";" }
 // select queries, get data from the database
 
 select_query = {
-  "select"~ select_list
+  "select"~ expression_list
     ~ "from" ~ table_expression
     ~ where_clause?
     ~ order_by_clause?
     ~ limit_clause?
 }
-select_list = { expression ~ ("," ~ expression)* }
+
+expression_list = { expression ~ ("," ~ expression)* }
 identifier_list = { identifier ~ ("," ~ identifier)* }
 
 // table expressions have a root table then a series of joins, with joins

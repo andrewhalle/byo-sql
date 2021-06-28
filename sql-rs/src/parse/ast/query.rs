@@ -1,6 +1,6 @@
 // TODO
 // use super::CreateTableQuery;
-// use super::InsertQuery;
+use super::InsertQuery;
 use super::SelectQuery;
 
 /// The root of the AST, representing a single query.
@@ -9,7 +9,7 @@ use super::SelectQuery;
 #[derive(Debug)]
 pub enum Query<'input> {
     SelectQuery(SelectQuery<'input>),
-    //InsertQuery(InsertQuery<'input>),
+    InsertQuery(InsertQuery<'input>),
     //CreateTableQuery(CreateTableQuery<'input>),
 }
 
@@ -24,6 +24,7 @@ impl<'input> From<Pair<'input, Rule>> for Query<'input> {
         let query = inner.next().unwrap();
         match query.as_rule() {
             Rule::select_query => Query::SelectQuery(query.into()),
+            Rule::insert_query => Query::InsertQuery(query.into()),
             _ => unreachable!(),
         }
     }
