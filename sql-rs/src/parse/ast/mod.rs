@@ -33,6 +33,12 @@ pub use expression::*;
 mod table_expression;
 pub use table_expression::*;
 
+mod join;
+pub use join::*;
+
+mod order_by;
+pub use order_by::*;
+
 // Template
 // /// <Quick description.>
 // ///

@@ -24,7 +24,7 @@ column_identifier = { (identifier ~ "." ~ column) | column }
 // the entry symbol, queries, a list of queries. a query must be terminated by
 // a ;
 
-queries = { query* }
+queries = { query+ }
 query = { (select_query | insert_query | create_table_query) ~ ";" }
 
 // select queries, get data from the database
@@ -59,7 +59,7 @@ where_clause = { "where" ~ expression }
 order_by_clause = { "order" ~ "by" ~ expression ~ direction? }
 direction = { "asc" | "desc" }
 
-limit_clause = { "limit" ~ number_literal }
+limit_clause = { "limit" ~ expression }
 
 // insert queries, insert a single row into the database with a list of literal
 // values.
@@ -81,7 +81,7 @@ datatype = { "text" | "number" | "boolean" }
 // handle precedence with a PrecClimber in code
 expression = { atom ~ (op ~ atom)* }
 atom = _{ count_star | ("(" ~ expression ~ ")") | literal | column_identifier }
-op = _{ greater_equal | less_equal | greater | less | and | or | equal }
+op = _{ greater_equal | less_equal | greater | less | and | or | equal | plus | minus }
   greater_equal = { ">=" }
   less_equal = { "<=" }
   greater = { ">" }
@@ -90,4 +90,6 @@ op = _{ greater_equal | less_equal | greater | less | and | or | equal }
   and = @{ "and" ~ WHITESPACE }
   or = @{ "or" ~ WHITESPACE }
   equal = { "=" }
+  plus = { "+" }
+  minus = { "-" }
 count_star = { "count(*)" }

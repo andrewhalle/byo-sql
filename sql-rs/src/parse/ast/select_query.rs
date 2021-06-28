@@ -1,4 +1,4 @@
-use super::{Expression, Literal, SelectList, TableExpression};
+use super::{Expression, OrderBy, SelectList, TableExpression};
 
 /// TODO quick description.
 ///
@@ -6,11 +6,10 @@ use super::{Expression, Literal, SelectList, TableExpression};
 #[derive(Debug)]
 pub struct SelectQuery<'input> {
     select_list: SelectList<'input>,
-    // table: TableExpression<'input>,
-    table: TableExpression,
+    table: TableExpression<'input>,
     filter: Option<Expression<'input>>,
-    sort: Option<Expression<'input>>,
-    limit: Option<Literal<'input>>,
+    sort: Option<OrderBy<'input>>,
+    limit: Option<Expression<'input>>,
 }
 
 use crate::parse::Rule;
@@ -32,9 +31,9 @@ impl<'input> From<Pair<'input, Rule>> for SelectQuery<'input> {
             let pair = inner.next();
             match pair {
                 Some(pair) => match pair.as_rule() {
-                    Rule::where_clause => filter = Some(pair.into()),
+                    Rule::where_clause => filter = Some(pair.into_inner().next().unwrap().into()),
                     Rule::order_by_clause => sort = Some(pair.into()),
-                    Rule::limit_clause => limit = Some(pair.into()),
+                    Rule::limit_clause => limit = Some(pair.into_inner().next().unwrap().into()),
                     _ => unreachable!(),
                 },
                 None => break,

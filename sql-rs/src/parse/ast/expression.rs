@@ -33,6 +33,8 @@ enum ExpressionOp {
     And,
     Or,
     Equal,
+    Plus,
+    Minus,
 }
 
 lazy_static! {
@@ -47,6 +49,7 @@ lazy_static! {
                 | Operator::new(less_equal, Left)
                 | Operator::new(less, Left)
                 | Operator::new(equal, Left),
+            Operator::new(plus, Left) | Operator::new(minus, Left),
         ])
     };
 }
@@ -91,6 +94,8 @@ impl From<Pair<'_, Rule>> for ExpressionOp {
                 || rule == and
                 || rule == or
                 || rule == equal
+                || rule == plus
+                || rule == minus
         );
 
         match rule {
@@ -101,6 +106,8 @@ impl From<Pair<'_, Rule>> for ExpressionOp {
             and => ExpressionOp::And,
             or => ExpressionOp::Or,
             equal => ExpressionOp::Equal,
+            plus => ExpressionOp::Plus,
+            minus => ExpressionOp::Minus,
             _ => unreachable!(),
         }
     }
