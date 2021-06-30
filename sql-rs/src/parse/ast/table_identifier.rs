@@ -6,8 +6,8 @@ use super::Identifier;
 /// and establishes the context for expression evaluation using alias.column syntax.
 #[derive(Debug)]
 pub struct TableIdentifier<'input> {
-    name: Identifier<'input>,
-    alias: Option<Identifier<'input>>,
+    pub name: Identifier<'input>,
+    pub alias: Option<Identifier<'input>>,
 }
 
 use crate::parse::Rule;

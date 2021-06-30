@@ -6,6 +6,9 @@ use std::process;
 use ansi_term::Colour;
 
 use crate::new_alias_map;
+use crate::parse::ast;
+use crate::parse::parse_queries;
+use crate::Column;
 use crate::CreateTableQueryResult;
 use crate::InsertQueryResult;
 use crate::Query;
@@ -14,6 +17,7 @@ use crate::Row;
 use crate::SelectQueryResult;
 use crate::SelectQueryResultColumn;
 use crate::Table;
+use crate::Value;
 
 pub struct Database {
     tables: Vec<Table>,
@@ -35,7 +39,7 @@ impl Database {
     fn execute(&mut self, query: Query) -> QueryResult {
         match query {
             Query::SelectQuery(query) => {
-                let table = self.find_table(query.table.root_table.name);
+                let table = self.find_table(query.table.root_table.name.0);
                 let mut result = SelectQueryResult {
                     columns: table
                         .columns
@@ -47,7 +51,7 @@ impl Database {
                 };
 
                 for join in query.table.joins {
-                    let table = self.find_table(join.table.name);
+                    let table = self.find_table(join.table.name.0);
                     let mut table = SelectQueryResult {
                         columns: table
                             .columns
@@ -69,7 +73,8 @@ impl Database {
                 }
 
                 if let Some(rows) = &query.limit {
-                    result.limit(*rows);
+                    // XXX evaluate, need to re-think this
+                    result.limit(evaluate(rows).as_number());
                 }
 
                 let result = result.select(query.select_list);
@@ -77,13 +82,15 @@ impl Database {
                 QueryResult::SelectQueryResult(result)
             }
             Query::InsertQuery(query) => {
-                if query.column_list.len() != query.values.len() {
+                if query.columns.len() != query.values.len() {
                     panic!();
                 }
 
-                let table = self.find_table_mut(query.table);
+                let table = self.find_table_mut(query.table.0);
                 let mut indices = table
-                    .validate_insert_query_columns(&query.column_list)
+                    .validate_insert_query_columns(
+                        &(query.columns.iter().map(|i| i.0).collect::<Vec<&str>>()),
+                    )
                     .unwrap();
                 let mut row = table.new_values_vec();
                 let mut values = query.values;
@@ -92,11 +99,12 @@ impl Database {
                     let i = indices.pop().unwrap();
                     let value = values.pop().unwrap();
 
+                    let value = value.into();
                     if !table.compatible_type(i, &value) {
                         panic!();
                     }
 
-                    row[i] = value;
+                    row[i] = value.into();
                 }
 
                 table.rows.push(Row(row));
@@ -106,8 +114,15 @@ impl Database {
             Query::CreateTableQuery(query) => {
                 // TODO check that table doesn't exist
                 let table = Table {
-                    name: query.table_name.to_owned(),
-                    columns: query.columns,
+                    name: query.table_name.0.to_owned(),
+                    columns: query
+                        .columns
+                        .iter()
+                        .map(|c| Column {
+                            name: c.name.0.to_owned(),
+                            datatype: c.datatype,
+                        })
+                        .collect(),
                     rows: Vec::new(),
                 };
                 self.tables.push(table);
@@ -133,12 +148,14 @@ impl Database {
                 break;
             }
 
-            let query = Query::from(&line);
+            let queries = parse_queries(&line);
 
-            match query {
-                Ok(query) => {
-                    let result = self.execute(query);
-                    println!("{}", result);
+            match queries {
+                Ok(queries) => {
+                    for query in queries.0 {
+                        let result = self.execute(query);
+                        println!("{}", result);
+                    }
                 }
                 Err(parse_error) => {
                     println!("{}", parse_error);
@@ -149,11 +166,11 @@ impl Database {
 
     pub fn seed(&mut self, seed_file: PathBuf) {
         let seed = fs::read_to_string(seed_file).unwrap();
-        let queries = Query::get_many(&seed);
+        let queries = parse_queries(&seed);
 
         match queries {
             Ok(queries) => {
-                for query in queries {
+                for query in queries.0 {
                     self.execute(query);
                 }
             }
@@ -166,4 +183,9 @@ impl Database {
         let style = Colour::Fixed(251).italic();
         println!("{}\n\n{}", style.paint("Seeded with:"), style.paint(&seed));
     }
+}
+
+// TODO remove me
+fn evaluate(x: &ast::Expression<'_>) -> Value {
+    todo!()
 }

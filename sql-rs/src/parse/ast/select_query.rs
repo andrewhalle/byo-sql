@@ -5,11 +5,11 @@ use super::{Expression, List, OrderBy, TableExpression};
 /// TODO long description.
 #[derive(Debug)]
 pub struct SelectQuery<'input> {
-    select_list: Vec<Expression<'input>>,
-    table: TableExpression<'input>,
-    filter: Option<Expression<'input>>,
-    sort: Option<OrderBy<'input>>,
-    limit: Option<Expression<'input>>,
+    pub select_list: Vec<Expression<'input>>,
+    pub table: TableExpression<'input>,
+    pub filter: Option<Expression<'input>>,
+    pub sort: Option<OrderBy<'input>>,
+    pub limit: Option<Expression<'input>>,
 }
 
 use crate::parse::Rule;

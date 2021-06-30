@@ -5,8 +5,8 @@ use super::Expression;
 /// TODO long description.
 #[derive(Debug)]
 pub struct OrderBy<'input> {
-    expr: Expression<'input>,
-    direction: OrderByDirection,
+    pub expr: Expression<'input>,
+    pub direction: OrderByDirection,
 }
 
 #[derive(Debug)]

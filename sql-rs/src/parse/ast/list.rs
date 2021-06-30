@@ -1,6 +1,7 @@
 use crate::parse::Rule;
 
 /// Helper trait for parsing a repeated rule into a Vec via List.
+// seal trait?
 pub trait Listable {
     fn get_rule() -> Rule;
 }

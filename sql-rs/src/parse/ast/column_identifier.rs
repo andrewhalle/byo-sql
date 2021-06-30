@@ -6,8 +6,8 @@ use super::{Column, Identifier};
 /// column is specified with `alias.column`.
 #[derive(Debug)]
 pub struct ColumnIdentifier<'input> {
-    alias: Option<Identifier<'input>>,
-    name: Column<'input>,
+    pub alias: Option<Identifier<'input>>,
+    pub name: Column<'input>,
 }
 
 use crate::parse::Rule;

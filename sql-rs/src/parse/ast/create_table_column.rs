@@ -5,8 +5,8 @@ use super::{Datatype, Identifier, Listable};
 /// TODO long description.
 #[derive(Debug)]
 pub struct CreateTableColumn<'input> {
-    name: Identifier<'input>,
-    datatype: Datatype,
+    pub name: Identifier<'input>,
+    pub datatype: Datatype,
 }
 
 use crate::parse::Rule;

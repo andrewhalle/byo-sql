@@ -5,8 +5,8 @@ use super::{Join, TableIdentifier};
 /// TODO long description.
 #[derive(Debug)]
 pub struct TableExpression<'input> {
-    root_table: TableIdentifier<'input>,
-    joins: Vec<Join<'input>>,
+    pub root_table: TableIdentifier<'input>,
+    pub joins: Vec<Join<'input>>,
 }
 
 use crate::parse::Rule;

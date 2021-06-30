@@ -39,3 +39,14 @@ impl<'input> Listable for Literal<'input> {
         Rule::literal_list
     }
 }
+
+use crate::Value;
+impl<'input> From<Literal<'input>> for Value {
+    fn from(literal: Literal<'input>) -> Self {
+        match literal {
+            Literal::String(s) => Value::Text(s.to_owned()),
+            Literal::Number(n) => Value::Number(n.parse().unwrap()),
+            Literal::Boolean(b) => Value::Boolean(b.parse().unwrap()),
+        }
+    }
+}

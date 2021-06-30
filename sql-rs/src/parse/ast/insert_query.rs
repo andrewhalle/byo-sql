@@ -5,9 +5,9 @@ use super::{Identifier, List, Literal};
 /// TODO long description.
 #[derive(Debug)]
 pub struct InsertQuery<'input> {
-    table: Identifier<'input>,
-    columns: Vec<Identifier<'input>>,
-    values: Vec<Literal<'input>>,
+    pub table: Identifier<'input>,
+    pub columns: Vec<Identifier<'input>>,
+    pub values: Vec<Literal<'input>>,
 }
 
 use crate::parse::Rule;

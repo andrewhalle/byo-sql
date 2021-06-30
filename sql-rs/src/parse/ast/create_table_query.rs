@@ -5,8 +5,8 @@ use super::{CreateTableColumn, Identifier, List};
 /// TODO long description.
 #[derive(Debug)]
 pub struct CreateTableQuery<'input> {
-    table_name: Identifier<'input>,
-    columns: Vec<CreateTableColumn<'input>>,
+    pub table_name: Identifier<'input>,
+    pub columns: Vec<CreateTableColumn<'input>>,
 }
 
 use crate::parse::Rule;

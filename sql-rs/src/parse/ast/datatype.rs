@@ -2,7 +2,7 @@
 ///
 /// TODO long description.
 // TODO move the enum declaration into the data model, and leave the implementation of From<Pair<..>> here
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Datatype {
     Number,
     Text,

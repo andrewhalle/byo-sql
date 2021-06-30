@@ -1,6 +1,4 @@
-use super::CreateTableQuery;
-use super::InsertQuery;
-use super::SelectQuery;
+use super::{CreateTableQuery, InsertQuery, SelectQuery};
 
 /// The root of the AST, representing a single query.
 ///
@@ -31,7 +29,7 @@ impl<'input> From<Pair<'input, Rule>> for Query<'input> {
 }
 
 #[derive(Debug)]
-pub struct Queries<'input>(Vec<Query<'input>>);
+pub struct Queries<'input>(pub Vec<Query<'input>>);
 
 impl<'input> From<Pair<'input, Rule>> for Queries<'input> {
     fn from(queries: Pair<'input, Rule>) -> Self {
