@@ -42,6 +42,15 @@ pub use insert_query::*;
 mod list;
 pub use list::*;
 
+mod create_table_query;
+pub use create_table_query::*;
+
+mod create_table_column;
+pub use create_table_column::*;
+
+mod datatype;
+pub use datatype::*;
+
 // Template
 // /// <Quick description.>
 // ///

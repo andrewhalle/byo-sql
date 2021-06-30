@@ -3,6 +3,8 @@ use super::Listable;
 /// A literal value.
 ///
 /// Possible literals are string literals, number literals, and boolean literals.
+// TODO consider removing this type, and using the Value type from the data module, leaving the
+// implementation of From<Pair<..>> here
 #[derive(Debug)]
 pub enum Literal<'input> {
     String(&'input str),

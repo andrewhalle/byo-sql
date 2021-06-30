@@ -1,5 +1,4 @@
-// TODO
-// use super::CreateTableQuery;
+use super::CreateTableQuery;
 use super::InsertQuery;
 use super::SelectQuery;
 
@@ -10,7 +9,7 @@ use super::SelectQuery;
 pub enum Query<'input> {
     SelectQuery(SelectQuery<'input>),
     InsertQuery(InsertQuery<'input>),
-    //CreateTableQuery(CreateTableQuery<'input>),
+    CreateTableQuery(CreateTableQuery<'input>),
 }
 
 use crate::parse::Rule;
@@ -25,6 +24,7 @@ impl<'input> From<Pair<'input, Rule>> for Query<'input> {
         match query.as_rule() {
             Rule::select_query => Query::SelectQuery(query.into()),
             Rule::insert_query => Query::InsertQuery(query.into()),
+            Rule::create_table_query => Query::CreateTableQuery(query.into()),
             _ => unreachable!(),
         }
     }
