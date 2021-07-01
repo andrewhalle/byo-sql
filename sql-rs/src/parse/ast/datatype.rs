@@ -1,14 +1,4 @@
-/// TODO quick description.
-///
-/// TODO long description.
-// TODO move the enum declaration into the data model, and leave the implementation of From<Pair<..>> here
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Datatype {
-    Number,
-    Text,
-    Boolean,
-}
-
+use crate::data::Datatype;
 use crate::parse::Rule;
 use pest::iterators::Pair;
 

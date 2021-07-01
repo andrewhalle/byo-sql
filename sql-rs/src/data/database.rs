@@ -5,15 +5,15 @@ use std::process;
 
 use ansi_term::Colour;
 
+use super::Column;
+use super::Row;
 use crate::new_alias_map;
 use crate::parse::ast;
 use crate::parse::parse_queries;
-use crate::Column;
 use crate::CreateTableQueryResult;
 use crate::InsertQueryResult;
 use crate::Query;
 use crate::QueryResult;
-use crate::Row;
 use crate::SelectQueryResult;
 use crate::SelectQueryResultColumn;
 use crate::Table;
@@ -99,12 +99,12 @@ impl Database {
                     let i = indices.pop().unwrap();
                     let value = values.pop().unwrap();
 
-                    let value = value.into();
+                    let value = (&value).into();
                     if !table.compatible_type(i, &value) {
                         panic!();
                     }
 
-                    row[i] = value.into();
+                    row[i] = value;
                 }
 
                 table.rows.push(Row(row));
@@ -187,5 +187,14 @@ impl Database {
 
 // TODO remove me
 fn evaluate(x: &ast::Expression<'_>) -> Value {
-    todo!()
+    match x {
+        ast::Expression::Literal(l) => l.into(),
+        ast::Expression::BinaryOp(b) => {
+            let v1 = evaluate(&b.left);
+            let v2 = evaluate(&b.right);
+
+            v1.op(b.op, v2)
+        }
+        _ => unreachable!(),
+    }
 }

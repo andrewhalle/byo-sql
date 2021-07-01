@@ -1,4 +1,5 @@
-use super::{Datatype, Identifier, Listable};
+use super::{Identifier, Listable};
+use crate::data::Datatype;
 
 /// TODO quick description.
 ///

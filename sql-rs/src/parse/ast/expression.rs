@@ -19,13 +19,13 @@ pub enum Expression<'input> {
 
 #[derive(Debug)]
 pub struct BinaryOp<'input> {
-    op: ExpressionOp,
-    left: Box<Expression<'input>>,
-    right: Box<Expression<'input>>,
+    pub op: ExpressionOp,
+    pub left: Box<Expression<'input>>,
+    pub right: Box<Expression<'input>>,
 }
 
-#[derive(Debug)]
-enum ExpressionOp {
+#[derive(Debug, Clone, Copy)]
+pub enum ExpressionOp {
     GreaterEqual,
     LessEqual,
     Greater,

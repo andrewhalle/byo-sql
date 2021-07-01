@@ -10,6 +10,7 @@ extern crate pest_derive;
 
 /// Data representation.
 pub mod data;
+use data::{Column, Datatype, Row, Value};
 /// Executing a query against a database.
 pub mod execute;
 /// Parsing SQL.
@@ -86,22 +87,6 @@ impl Table {
         let column = &self.columns[column_index];
         value.assignable_to(column.datatype)
     }
-}
-
-#[derive(Clone, Debug)]
-struct Column {
-    name: String,
-    datatype: Datatype,
-}
-
-// TODO remove PartialEq and Eq
-// TODO this and Datatype are very similar
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Value {
-    Null,
-    Number(u32),
-    Text(String),
-    Boolean(bool),
 }
 
 #[derive(PartialEq, Eq)]
@@ -205,9 +190,6 @@ impl Display for Value {
     }
 }
 
-#[derive(Clone)]
-struct Row(Vec<Value>);
-
 impl<'input> Expression<'input> {
     // TODO make better / re-locate
     fn is_column_star(&self) -> bool {
@@ -271,7 +253,7 @@ impl SelectQueryResult {
     // TODO should this clone?
     fn get_column_value_from_row(
         &self,
-        column_identifier: ColumnIdentifier<'_>,
+        column_identifier: &ColumnIdentifier<'_>,
         row: &Row,
     ) -> Value {
         assert!(!matches!(column_identifier.name, ast::Column::Star));
@@ -291,7 +273,17 @@ impl SelectQueryResult {
 
     // TODO re-write using ast::Expression
     fn evaluate(&self, expr: &Expression<'_>, row: &Row) -> Value {
-        todo!()
+        match expr {
+            ast::Expression::ColumnIdentifier(i) => self.get_column_value_from_row(i, row),
+            ast::Expression::Literal(l) => l.into(),
+            ast::Expression::BinaryOp(b) => {
+                let v1 = self.evaluate(&b.left, row);
+                let v2 = self.evaluate(&b.right, row);
+
+                v1.op(b.op, v2)
+            }
+            _ => unreachable!(),
+        }
     }
 
     fn select(&mut self, select_list: Vec<Expression<'_>>) -> Self {
