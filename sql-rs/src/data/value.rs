@@ -16,8 +16,15 @@ pub enum Value {
 impl Value {
     pub fn op(self, op: ExpressionOp, rhs: Value) -> Value {
         match op {
+            ExpressionOp::GreaterEqual => Value::Boolean(self.greater_equal(&rhs)),
+            ExpressionOp::LessEqual => Value::Boolean(self.less_equal(&rhs)),
+            ExpressionOp::Greater => Value::Boolean(self.greater(&rhs)),
+            ExpressionOp::Less => Value::Boolean(self.less(&rhs)),
+            ExpressionOp::And => Value::Boolean(self.is_true() && rhs.is_true()),
+            ExpressionOp::Or => Value::Boolean(self.is_true() || rhs.is_true()),
             ExpressionOp::Equal => Value::Boolean(self == rhs),
-            _ => todo!(),
+            ExpressionOp::Plus => Value::Number(self.as_number() + rhs.as_number()),
+            ExpressionOp::Minus => Value::Number(self.as_number() - rhs.as_number()),
         }
     }
 }

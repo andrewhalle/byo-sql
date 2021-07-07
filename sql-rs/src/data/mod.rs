@@ -15,3 +15,6 @@ pub use column::*;
 
 mod datatype;
 pub use datatype::*;
+
+mod table;
+pub use table::*;

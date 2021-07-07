@@ -7,6 +7,7 @@ use ansi_term::Colour;
 
 use super::Column;
 use super::Row;
+use super::Table;
 use crate::new_alias_map;
 use crate::parse::ast;
 use crate::parse::parse_queries;
@@ -16,7 +17,6 @@ use crate::Query;
 use crate::QueryResult;
 use crate::SelectQueryResult;
 use crate::SelectQueryResultColumn;
-use crate::Table;
 use crate::Value;
 
 pub struct Database {

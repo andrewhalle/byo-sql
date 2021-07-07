@@ -1,7 +1,7 @@
 //! A crate for parsing and executing SQL in-memory against a simple database representation.
 
 use std::cmp::{Ordering, Reverse};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::mem;
 
@@ -16,12 +16,6 @@ pub mod execute;
 /// Parsing SQL.
 pub mod parse;
 use parse::ast::{self, *};
-
-struct Table {
-    name: String,
-    columns: Vec<Column>,
-    rows: Vec<Row>,
-}
 
 fn new_alias_map(table: &TableIdentifier<'_>) -> HashMap<String, String> {
     let mut map = HashMap::new();
@@ -48,44 +42,6 @@ fn cmp_column_with_column_identifier(
     match c2.alias.as_ref() {
         None => names_match,
         Some(alias) => &c1.table == table_alias_map.get(alias.0).unwrap() && names_match,
-    }
-}
-
-impl Table {
-    fn validate_insert_query_columns(&self, insert_query_columns: &[&str]) -> Option<Vec<usize>> {
-        // first check that all columns are provided
-        {
-            let self_columns: HashSet<&str> =
-                self.columns.iter().map(|c| c.name.as_str()).collect();
-            let insert_query_columns: HashSet<&str> =
-                insert_query_columns.iter().map(|c| *c).collect();
-
-            if self_columns != insert_query_columns {
-                return None;
-            }
-        }
-
-        // then map the insert_query_column to the index in the table specificiation
-        let self_columns: Vec<(usize, &str)> = self
-            .columns
-            .iter()
-            .map(|c| c.name.as_str())
-            .enumerate()
-            .collect();
-        let indices = insert_query_columns
-            .iter()
-            .map(|c1| self_columns.iter().find(|(_, c2)| c1 == c2).unwrap().0)
-            .collect();
-        Some(indices)
-    }
-
-    fn new_values_vec(&self) -> Vec<Value> {
-        vec![Value::Null; self.columns.len()]
-    }
-
-    fn compatible_type(&self, column_index: usize, value: &Value) -> bool {
-        let column = &self.columns[column_index];
-        value.assignable_to(column.datatype)
     }
 }
 
@@ -124,20 +80,6 @@ impl PartialOrd for SortableValue {
     }
 }
 
-macro_rules! value_op {
-    ($name:ident, $op:tt) => {
-        impl Value {
-            fn $name(&self, rhs: &Value) -> bool {
-                match self {
-                    Value::Text(_) => self.as_str() $op rhs.as_str(),
-                    Value::Number(_) => self.as_number() $op rhs.as_number(),
-                    _ => panic!("operands of $op must be text or number"),
-                }
-            }
-        }
-    };
-}
-
 impl Value {
     fn assignable_to(&self, datatype: Datatype) -> bool {
         match self {
@@ -146,11 +88,6 @@ impl Value {
             Value::Text(_) => datatype == Datatype::Text,
             Value::Boolean(_) => datatype == Datatype::Boolean,
         }
-    }
-
-    // TODO impl From<Literal<'_>>
-    fn from(literal: Literal<'_>) -> Self {
-        todo!()
     }
 
     fn is_true(&self) -> bool {
@@ -174,6 +111,21 @@ impl Value {
         }
     }
 }
+
+macro_rules! value_op {
+    ($name:ident, $op:tt) => {
+        impl Value {
+            fn $name(&self, rhs: &Value) -> bool {
+                match self {
+                    Value::Text(_) => self.as_str() $op rhs.as_str(),
+                    Value::Number(_) => self.as_number() $op rhs.as_number(),
+                    _ => panic!("operands of $op must be text or number"),
+                }
+            }
+        }
+    };
+}
+
 value_op!(greater_equal, >=);
 value_op!(greater, >);
 value_op!(less_equal, <=);
