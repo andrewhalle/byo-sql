@@ -8,15 +8,14 @@ use ansi_term::Colour;
 use super::Column;
 use super::Row;
 use super::Table;
+use crate::execute::{
+    CreateTableQueryResult, InsertQueryResult, QueryResult, SelectQueryResult,
+    SelectQueryResultColumn,
+};
 use crate::new_alias_map;
 use crate::parse::ast;
 use crate::parse::parse_queries;
-use crate::CreateTableQueryResult;
-use crate::InsertQueryResult;
 use crate::Query;
-use crate::QueryResult;
-use crate::SelectQueryResult;
-use crate::SelectQueryResultColumn;
 use crate::Value;
 
 pub struct Database {
