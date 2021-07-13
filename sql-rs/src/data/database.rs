@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
@@ -19,20 +20,22 @@ use crate::Query;
 use crate::Value;
 
 pub struct Database {
-    tables: Vec<Table>,
+    tables: HashMap<String, Table>,
 }
 
 impl Database {
     pub fn new() -> Self {
-        Database { tables: Vec::new() }
+        Database {
+            tables: HashMap::new(),
+        }
     }
 
     fn find_table(&self, table: &str) -> &Table {
-        self.tables.iter().find(|t| t.name == table).unwrap()
+        self.tables.get(table).unwrap()
     }
 
     fn find_table_mut(&mut self, table: &str) -> &mut Table {
-        self.tables.iter_mut().find(|t| t.name == table).unwrap()
+        self.tables.get_mut(table).unwrap()
     }
 
     fn execute(&mut self, query: Query) -> QueryResult {
@@ -43,7 +46,12 @@ impl Database {
                     columns: table
                         .columns
                         .iter()
-                        .map(|c| SelectQueryResultColumn::from(table.name.clone(), c))
+                        .map(|c| {
+                            SelectQueryResultColumn::from(
+                                query.table.root_table.name.0.to_owned(),
+                                c,
+                            )
+                        })
                         .collect(),
                     rows: table.rows.clone(),
                     table_alias_map: new_alias_map(&query.table.root_table),
@@ -55,7 +63,7 @@ impl Database {
                         columns: table
                             .columns
                             .iter()
-                            .map(|c| SelectQueryResultColumn::from(table.name.clone(), c))
+                            .map(|c| SelectQueryResultColumn::from(join.table.name.0.to_owned(), c))
                             .collect(),
                         rows: table.rows.clone(),
                         table_alias_map: new_alias_map(&join.table),
@@ -111,9 +119,10 @@ impl Database {
                 QueryResult::InsertQueryResult(InsertQueryResult { num_inserted: 1 })
             }
             Query::CreateTableQuery(query) => {
-                // TODO check that table doesn't exist
+                assert!(!self.tables.contains_key(query.table_name.0));
+
+                let name = query.table_name.0.to_owned();
                 let table = Table {
-                    name: query.table_name.0.to_owned(),
                     columns: query
                         .columns
                         .iter()
@@ -124,7 +133,7 @@ impl Database {
                         .collect(),
                     rows: Vec::new(),
                 };
-                self.tables.push(table);
+                self.tables.insert(name, table);
                 QueryResult::CreateTableQueryResult(CreateTableQueryResult)
             }
         }

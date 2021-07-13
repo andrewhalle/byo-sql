@@ -6,7 +6,6 @@ use super::{Column, Row, Value};
 ///
 /// TODO long description.
 pub struct Table {
-    pub name: String,
     pub columns: Vec<Column>,
     pub rows: Vec<Row>,
 }
