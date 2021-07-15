@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+#[derive(Debug)]
 pub struct InsertQueryResult {
     pub num_inserted: u32,
 }

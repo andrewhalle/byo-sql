@@ -6,13 +6,9 @@ use std::process;
 
 use ansi_term::Colour;
 
-use super::Column;
 use super::Row;
 use super::Table;
-use crate::execute::{
-    CreateTableQueryResult, InsertQueryResult, QueryResult, SelectQueryResult,
-    SelectQueryResultColumn,
-};
+use crate::execute::{InsertQueryResult, QueryResult, SelectQueryResult, SelectQueryResultColumn};
 use crate::new_alias_map;
 use crate::parse::ast;
 use crate::parse::parse_queries;
@@ -20,7 +16,7 @@ use crate::Query;
 use crate::Value;
 
 pub struct Database {
-    tables: HashMap<String, Table>,
+    pub tables: HashMap<String, Table>,
 }
 
 impl Database {
@@ -38,7 +34,7 @@ impl Database {
         self.tables.get_mut(table).unwrap()
     }
 
-    fn execute(&mut self, query: Query) -> QueryResult {
+    pub fn execute_old(&mut self, query: Query) -> QueryResult {
         match query {
             Query::SelectQuery(query) => {
                 let table = self.find_table(query.table.root_table.name.0);
@@ -118,24 +114,7 @@ impl Database {
 
                 QueryResult::InsertQueryResult(InsertQueryResult { num_inserted: 1 })
             }
-            Query::CreateTableQuery(query) => {
-                assert!(!self.tables.contains_key(query.table_name.0));
-
-                let name = query.table_name.0.to_owned();
-                let table = Table {
-                    columns: query
-                        .columns
-                        .iter()
-                        .map(|c| Column {
-                            name: c.name.0.to_owned(),
-                            datatype: c.datatype,
-                        })
-                        .collect(),
-                    rows: Vec::new(),
-                };
-                self.tables.insert(name, table);
-                QueryResult::CreateTableQueryResult(CreateTableQueryResult)
-            }
+            _ => unimplemented!(),
         }
     }
 
@@ -161,8 +140,10 @@ impl Database {
             match queries {
                 Ok(queries) => {
                     for query in queries.0 {
-                        let result = self.execute(query);
-                        println!("{}", result);
+                        match self.execute(query) {
+                            Ok(s) => println!("{}", s),
+                            Err(e) => println!("{}", e),
+                        }
                     }
                 }
                 Err(parse_error) => {

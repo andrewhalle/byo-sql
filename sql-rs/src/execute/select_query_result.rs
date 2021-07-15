@@ -26,6 +26,7 @@ impl SelectQueryResultColumn {
     }
 }
 
+#[derive(Debug)]
 pub struct SelectQueryResult {
     pub columns: Vec<SelectQueryResultColumn>,
     pub rows: Vec<Row>,
