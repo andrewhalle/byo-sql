@@ -6,9 +6,8 @@ use std::process;
 
 use ansi_term::Colour;
 
-use super::Row;
 use super::Table;
-use crate::execute::{InsertQueryResult, QueryResult, SelectQueryResult, SelectQueryResultColumn};
+use crate::execute::{QueryResult, SelectQueryResult, SelectQueryResultColumn};
 use crate::new_alias_map;
 use crate::parse::ast;
 use crate::parse::parse_queries;
@@ -26,11 +25,11 @@ impl Database {
         }
     }
 
-    fn find_table(&self, table: &str) -> &Table {
+    pub fn find_table(&self, table: &str) -> &Table {
         self.tables.get(table).unwrap()
     }
 
-    fn find_table_mut(&mut self, table: &str) -> &mut Table {
+    pub fn find_table_mut(&mut self, table: &str) -> &mut Table {
         self.tables.get_mut(table).unwrap()
     }
 
@@ -84,36 +83,6 @@ impl Database {
 
                 QueryResult::SelectQueryResult(result)
             }
-            Query::InsertQuery(query) => {
-                if query.columns.len() != query.values.len() {
-                    panic!();
-                }
-
-                let table = self.find_table_mut(query.table.0);
-                let mut indices = table
-                    .validate_insert_query_columns(
-                        &(query.columns.iter().map(|i| i.0).collect::<Vec<&str>>()),
-                    )
-                    .unwrap();
-                let mut row = table.new_values_vec();
-                let mut values = query.values;
-
-                while values.len() != 0 {
-                    let i = indices.pop().unwrap();
-                    let value = values.pop().unwrap();
-
-                    let value = (&value).into();
-                    if !table.compatible_type(i, &value) {
-                        panic!();
-                    }
-
-                    row[i] = value;
-                }
-
-                table.rows.push(Row(row));
-
-                QueryResult::InsertQueryResult(InsertQueryResult { num_inserted: 1 })
-            }
             _ => unimplemented!(),
         }
     }
@@ -160,7 +129,7 @@ impl Database {
         match queries {
             Ok(queries) => {
                 for query in queries.0 {
-                    self.execute(query);
+                    self.execute(query).unwrap();
                 }
             }
             Err(parse_error) => {
