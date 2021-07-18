@@ -35,7 +35,7 @@ impl Table {
     }
 
     // resulting table contains all rows of both tables
-    pub fn union(&mut self, other: &mut Table) -> Result<(), Error> {
+    pub fn union(&mut self, _other: &mut Table) -> Result<(), Error> {
         todo!()
     }
 }

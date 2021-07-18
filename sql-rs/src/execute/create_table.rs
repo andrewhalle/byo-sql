@@ -12,15 +12,10 @@ impl Display for Success {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("Table with that name already exists")]
     TableExists,
-}
-
-impl Display for Error {
-    fn fmt(&self, _f: &mut Formatter) -> Result<(), std::fmt::Error> {
-        todo!()
-    }
 }
 
 type QueryResult = Result<Success, Error>;
