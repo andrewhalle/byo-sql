@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::mem;
 
 use super::{Column, Row, Value};
 
@@ -8,6 +9,35 @@ use super::{Column, Row, Value};
 pub struct Table {
     pub columns: Vec<Column>,
     pub rows: Vec<Row>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("union of tables requires columns of LHS and RHS to match")]
+    ColumnMismatch,
+}
+
+// fundamental table operations
+
+impl Table {
+    pub fn filter<F: Fn(&Row) -> bool>(&mut self, predicate: F) {
+        let mut rows = Vec::new();
+        mem::swap(&mut rows, &mut self.rows);
+        self.rows = rows.into_iter().filter(predicate).collect();
+    }
+
+    pub fn limit(&mut self, limit: usize) {
+        self.rows.truncate(limit);
+    }
+
+    pub fn sort<K: Ord, F: Fn(&Row) -> K>(&mut self, key_fn: F) {
+        self.rows.sort_unstable_by_key(key_fn);
+    }
+
+    // resulting table contains all rows of both tables
+    pub fn union(&mut self, other: &mut Table) -> Result<(), Error> {
+        todo!()
+    }
 }
 
 impl Table {
