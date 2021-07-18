@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
 use std::mem;
 
 use super::{Column, Row, Value};
@@ -6,6 +7,7 @@ use super::{Column, Row, Value};
 /// TODO short description.
 ///
 /// TODO long description.
+#[derive(Debug, Clone)]
 pub struct Table {
     pub columns: Vec<Column>,
     pub rows: Vec<Row>,
@@ -37,6 +39,16 @@ impl Table {
     // resulting table contains all rows of both tables
     pub fn union(&mut self, _other: &mut Table) -> Result<(), Error> {
         todo!()
+    }
+}
+
+// utilities
+
+impl Table {
+    pub fn prefix_column_names(&mut self, prefix: &str) {
+        for column in &mut self.columns {
+            column.name.insert_str(0, prefix);
+        }
     }
 }
 
@@ -78,5 +90,12 @@ impl Table {
     pub fn compatible_type(&self, column_index: usize, value: &Value) -> bool {
         let column = &self.columns[column_index];
         value.assignable_to(column.datatype)
+    }
+}
+
+// XXX
+impl Display for Table {
+    fn fmt(&self, _f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        todo!()
     }
 }

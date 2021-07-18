@@ -1,12 +1,8 @@
 ///! TODO long module description.
 
 /// TODO doc
-mod query_result;
-pub use query_result::*;
-
-/// TODO doc
-mod select_query_result;
-pub use select_query_result::*;
+mod select;
+pub use select::*;
 
 /// TODO doc
 mod insert;
@@ -23,18 +19,17 @@ use crate::parse::ast::Query;
 
 #[derive(Debug)]
 pub enum Success {
-    CreateTable(create_table::Success),
+    Select(select::Success),
     Insert(insert::Success),
-    // TODO remove me
-    OldImplementation(QueryResult),
+    CreateTable(create_table::Success),
 }
 
 impl Display for Success {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
         match self {
+            Success::Select(s) => write!(f, "{:?}", s),
             Success::CreateTable(s) => write!(f, "{}", s),
             Success::Insert(s) => write!(f, "{}", s),
-            Success::OldImplementation(s) => write!(f, "{}", s),
         }
     }
 }
@@ -50,8 +45,8 @@ impl Display for Error {
     }
 }
 
-impl From<create_table::Error> for Error {
-    fn from(_: create_table::Error) -> Self {
+impl From<select::Error> for Error {
+    fn from(_: select::Error) -> Self {
         Error::QueryFailed
     }
 }
@@ -62,14 +57,20 @@ impl From<insert::Error> for Error {
     }
 }
 
+impl From<create_table::Error> for Error {
+    fn from(_: create_table::Error) -> Self {
+        Error::QueryFailed
+    }
+}
+
 impl Database {
     pub fn execute(&mut self, query: Query<'_>) -> Result<Success, Error> {
         Ok(match query {
+            Query::SelectQuery(query) => Success::Select(self.execute_select(query)?),
             Query::InsertQuery(query) => Success::Insert(self.execute_insert(query)?),
             Query::CreateTableQuery(query) => {
                 Success::CreateTable(self.execute_create_table(query)?)
             }
-            _ => Success::OldImplementation(self.execute_old(query)),
         })
     }
 }

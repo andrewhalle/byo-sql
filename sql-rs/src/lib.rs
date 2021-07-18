@@ -1,7 +1,6 @@
 //! A crate for parsing and executing SQL in-memory against a simple database representation.
 
-use std::cmp::{Ordering, Reverse};
-use std::collections::HashMap;
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
 #[macro_use]
@@ -10,23 +9,14 @@ extern crate pest_derive;
 /// Data representation.
 pub mod data;
 use data::{Datatype, Value};
+
 /// Executing a query against a database.
 pub mod execute;
-use execute::SelectQueryResultColumn;
+
 /// Parsing SQL.
 pub mod parse;
-use parse::ast::{self, *};
 
-fn new_alias_map(table: &TableIdentifier<'_>) -> HashMap<String, String> {
-    let mut map = HashMap::new();
-    match &table.alias {
-        None => map.insert(table.name.0.to_owned(), table.name.0.to_owned()),
-        Some(alias) => map.insert(alias.0.to_owned(), table.name.0.to_owned()),
-    };
-
-    map
-}
-
+/*
 fn cmp_column_with_column_identifier(
     c1: &SelectQueryResultColumn,
     c2: &ColumnIdentifier<'_>,
@@ -44,6 +34,7 @@ fn cmp_column_with_column_identifier(
         Some(alias) => &c1.table == table_alias_map.get(alias.0).unwrap() && names_match,
     }
 }
+*/
 
 #[derive(PartialEq, Eq)]
 struct SortableValue(Value);
@@ -142,6 +133,7 @@ impl Display for Value {
     }
 }
 
+/*
 impl<'input> Expression<'input> {
     // TODO make better / re-locate
     fn is_column_star(&self) -> bool {
@@ -159,9 +151,4 @@ impl<'input> Expression<'input> {
         matches!(self, ast::Expression::CountStar)
     }
 }
-
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
-enum OrdVariants {
-    SortableValue(SortableValue),
-    Reversed(Reverse<SortableValue>),
-}
+*/

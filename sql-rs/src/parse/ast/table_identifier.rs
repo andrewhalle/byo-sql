@@ -10,6 +10,15 @@ pub struct TableIdentifier<'input> {
     pub alias: Option<Identifier<'input>>,
 }
 
+impl<'input> TableIdentifier<'input> {
+    pub fn as_str(&self) -> &str {
+        match &self.alias {
+            Some(i) => i.0,
+            None => self.name.0,
+        }
+    }
+}
+
 use crate::parse::Rule;
 use pest::iterators::Pair;
 
