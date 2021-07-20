@@ -7,6 +7,15 @@ pub enum Column<'input> {
     Ident(Identifier<'input>),
 }
 
+impl<'input> Column<'input> {
+    pub fn as_string(&self) -> String {
+        match self {
+            Column::Star => "*".to_owned(),
+            Column::Ident(i) => i.0.to_owned(),
+        }
+    }
+}
+
 use crate::parse::Rule;
 use pest::iterators::Pair;
 

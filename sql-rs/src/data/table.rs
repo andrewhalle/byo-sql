@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::mem;
 
 use super::{Column, Row, Value};
+use crate::parse::ast::ColumnIdentifier;
 
 /// TODO short description.
 ///
@@ -13,6 +14,9 @@ pub struct Table {
     pub rows: Vec<Row>,
 }
 
+// XXX duplicated execute/evaluate.rs
+pub type EvaluationContext<'table> = (&'table Vec<Column>, &'table Row);
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("union of tables requires columns of LHS and RHS to match")]
@@ -22,10 +26,34 @@ pub enum Error {
 // fundamental table operations
 
 impl Table {
-    pub fn filter<F: Fn(&Row) -> bool>(&mut self, predicate: F) {
-        let mut rows = Vec::new();
-        mem::swap(&mut rows, &mut self.rows);
-        self.rows = rows.into_iter().filter(predicate).collect();
+    pub fn get_column_idx(columns: &Vec<Column>, column_identifier: &ColumnIdentifier) -> usize {
+        // TODO make sure that the column identifier uniquely specifies a column within the table
+        let (column_idx, _) = columns
+            .iter()
+            .enumerate()
+            .find(|(_, column)| {
+                let mut parts = column.name.split(".");
+
+                let _alias = parts.next().unwrap();
+                let name = parts.next().unwrap();
+
+                match &column_identifier.alias {
+                    None => name == column_identifier.as_string(),
+                    Some(_) => column.name == column_identifier.as_string(),
+                }
+            })
+            .unwrap();
+
+        column_idx
+    }
+
+    pub fn filter<F: Fn(EvaluationContext) -> bool>(&mut self, predicate: F) {
+        let mut columns = Vec::new();
+        mem::swap(&mut columns, &mut self.columns);
+
+        self.rows.retain(|row| predicate((&columns, row)));
+
+        mem::swap(&mut columns, &mut self.columns);
     }
 
     pub fn limit(&mut self, limit: usize) {

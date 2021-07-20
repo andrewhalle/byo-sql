@@ -10,6 +10,15 @@ pub struct ColumnIdentifier<'input> {
     pub name: Column<'input>,
 }
 
+impl<'input> ColumnIdentifier<'input> {
+    pub fn as_string(&self) -> String {
+        match &self.alias {
+            None => self.name.as_string(),
+            Some(a) => format!("{}.{}", a.0, self.name.as_string()),
+        }
+    }
+}
+
 use crate::parse::Rule;
 use pest::iterators::Pair;
 

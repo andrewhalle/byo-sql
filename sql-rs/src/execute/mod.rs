@@ -12,6 +12,10 @@ pub use insert::*;
 mod create_table;
 pub use create_table::*;
 
+/// TODO doc
+mod evaluate;
+pub use evaluate::*;
+
 use std::fmt::{Display, Formatter};
 
 use crate::data::Database;

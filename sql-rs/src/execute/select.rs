@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+use super::evaluate;
 use crate::data::{Database, Table};
 use crate::parse::ast::SelectQuery;
 
@@ -36,11 +37,15 @@ impl Database {
             };
             result.join(&mut table, &join);
         }
+        */
 
         if let Some(filter) = &query.filter {
-            result.filter(filter);
+            result.filter(|evaluation_context| {
+                evaluate(filter, Some(evaluation_context), None).is_true()
+            });
         }
 
+        /*
         if let Some(sort) = &query.sort {
             result.sort(sort);
         }
