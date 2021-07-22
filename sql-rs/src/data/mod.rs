@@ -2,7 +2,7 @@
 //! Representing data in-memory.
 
 mod database;
-pub use database::{evaluate, Database};
+pub use database::*;
 
 mod value;
 pub use value::*;

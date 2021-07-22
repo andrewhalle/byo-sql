@@ -1,7 +1,7 @@
 use crate::data::{Column, Database, Row, Table, Value};
 use crate::parse::ast::Expression;
 
-type RowEvaluationContext<'table> = (&'table Vec<Column>, &'table Row);
+pub type RowEvaluationContext<'table> = (&'table Vec<Column>, &'table Row);
 
 /// TODO
 pub fn evaluate(

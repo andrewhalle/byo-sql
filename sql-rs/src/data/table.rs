@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::mem;
 
 use super::{Column, Row, Value};
+use crate::execute::RowEvaluationContext;
 use crate::parse::ast::ColumnIdentifier;
 
 /// TODO short description.
@@ -13,9 +14,6 @@ pub struct Table {
     pub columns: Vec<Column>,
     pub rows: Vec<Row>,
 }
-
-// XXX duplicated execute/evaluate.rs
-pub type EvaluationContext<'table> = (&'table Vec<Column>, &'table Row);
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -47,7 +45,7 @@ impl Table {
         column_idx
     }
 
-    pub fn filter<F: Fn(EvaluationContext) -> bool>(&mut self, predicate: F) {
+    pub fn filter<F: Fn(RowEvaluationContext) -> bool>(&mut self, predicate: F) {
         let mut columns = Vec::new();
         mem::swap(&mut columns, &mut self.columns);
 
@@ -60,8 +58,14 @@ impl Table {
         self.rows.truncate(limit);
     }
 
-    pub fn sort<K: Ord, F: Fn(&Row) -> K>(&mut self, key_fn: F) {
-        self.rows.sort_unstable_by_key(key_fn);
+    pub fn sort<K: Ord, F: Fn(RowEvaluationContext) -> K>(&mut self, key_fn: F) {
+        let mut columns = Vec::new();
+        mem::swap(&mut columns, &mut self.columns);
+
+        self.rows
+            .sort_unstable_by_key(|row| key_fn((&columns, row)));
+
+        mem::swap(&mut columns, &mut self.columns);
     }
 
     // resulting table contains all rows of both tables
@@ -121,9 +125,29 @@ impl Table {
     }
 }
 
-// XXX
 impl Display for Table {
-    fn fmt(&self, _f: &mut Formatter) -> Result<(), std::fmt::Error> {
-        todo!()
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        // write columns
+        let columns: Vec<_> = self.columns.iter().map(|v| v.to_string()).collect();
+        let columns: Vec<_> = columns.iter().map(|s| s.as_str()).collect();
+        writeln!(f, "{}", columns.join(","))?;
+
+        // write rows
+        let num_rows = self.rows.len();
+        for row in &self.rows[..num_rows - 1] {
+            let values: Vec<_> = row.0.iter().map(|v| v.to_string()).collect();
+            let values: Vec<_> = values.iter().map(|s| s.as_str()).collect();
+            writeln!(f, "{}", values.join(","))?;
+        }
+
+        let values: Vec<_> = self.rows[num_rows - 1]
+            .0
+            .iter()
+            .map(|v| v.to_string())
+            .collect();
+        let values: Vec<_> = values.iter().map(|s| s.as_str()).collect();
+        write!(f, "{}", values.join(","))?;
+
+        Ok(())
     }
 }

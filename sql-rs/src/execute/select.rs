@@ -1,8 +1,9 @@
+use std::cmp::Reverse;
 use std::fmt::{Display, Formatter};
 
 use super::evaluate;
 use crate::data::{Database, Table};
-use crate::parse::ast::SelectQuery;
+use crate::parse::ast::{OrderByDirection, SelectQuery};
 
 pub type Success = Table;
 
@@ -45,16 +46,22 @@ impl Database {
             });
         }
 
-        /*
         if let Some(sort) = &query.sort {
-            result.sort(sort);
+            match sort.direction {
+                OrderByDirection::Asc => result.sort(|evaluation_context| {
+                    evaluate(&sort.expr, Some(evaluation_context), None)
+                }),
+                OrderByDirection::Desc => result.sort(|evaluation_context| {
+                    Reverse(evaluate(&sort.expr, Some(evaluation_context), None))
+                }),
+            }
         }
 
         if let Some(rows) = &query.limit {
-            // XXX evaluate, need to re-think this
-            result.limit(evaluate(rows).as_number() as usize);
+            result.limit(evaluate(rows, None, None).as_number() as usize);
         }
 
+        /*
         let result = result.select(query.select_list);
         */
 

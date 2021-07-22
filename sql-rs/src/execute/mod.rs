@@ -31,7 +31,7 @@ pub enum Success {
 impl Display for Success {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
         match self {
-            Success::Select(s) => write!(f, "{:?}", s),
+            Success::Select(s) => write!(f, "{}", s),
             Success::CreateTable(s) => write!(f, "{}", s),
             Success::Insert(s) => write!(f, "{}", s),
         }
