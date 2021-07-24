@@ -24,21 +24,18 @@ impl Database {
         let mut result = self.find_table(query.table.root_table.name.0).clone();
         result.prefix_column_names(&format!("{}.", query.table.root_table.as_str()));
 
-        /* XXX
         for join in query.table.joins {
-            let table = self.find_table(join.table.name.0);
-            let mut table = SelectQueryResult {
-                columns: table
-                    .columns
-                    .iter()
-                    .map(|c| SelectQueryResultColumn::from(join.table.name.0.to_owned(), c))
-                    .collect(),
-                rows: table.rows.clone(),
-                table_alias_map: new_alias_map(&join.table),
-            };
-            result.join(&mut table, &join);
+            let mut table = self.find_table(join.table.name.0).clone();
+            table.prefix_column_names(&format!("{}.", join.table.as_str()));
+
+            result.join(
+                table,
+                |evaluation_context| {
+                    evaluate(&join.condition, Some(evaluation_context), None).is_true()
+                },
+                join.kind,
+            );
         }
-        */
 
         if let Some(filter) = &query.filter {
             result.filter(|evaluation_context| {

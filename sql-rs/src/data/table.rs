@@ -4,7 +4,7 @@ use std::mem;
 
 use super::{Column, Row, Value};
 use crate::execute::RowEvaluationContext;
-use crate::parse::ast::ColumnIdentifier;
+use crate::parse::ast::{ColumnIdentifier, JoinKind};
 
 /// TODO short description.
 ///
@@ -71,6 +71,84 @@ impl Table {
     // resulting table contains all rows of both tables
     pub fn union(&mut self, _other: &mut Table) -> Result<(), Error> {
         todo!()
+    }
+
+    // TODO re-write. make cleaner.
+    // Nested loop join.
+    pub fn join<F: Fn(RowEvaluationContext) -> bool>(
+        &mut self,
+        mut rhs: Table,
+        predicate: F,
+        join_kind: JoinKind,
+    ) {
+        let lhs_column_count = self.columns.len();
+        let rhs_column_count = rhs.columns.len();
+
+        self.columns.append(&mut rhs.columns);
+
+        let mut columns = Vec::new();
+        mem::swap(&mut columns, &mut self.columns);
+
+        let outer_iter = || match join_kind {
+            JoinKind::Right => rhs.rows.iter(),
+            _ => self.rows.iter(),
+        };
+        let inner_iter = || match join_kind {
+            JoinKind::Right => self.rows.iter(),
+            _ => rhs.rows.iter(),
+        };
+
+        let mut rows = Vec::new();
+        for i in outer_iter() {
+            let mut did_add_row = false;
+
+            for j in inner_iter() {
+                let mut row = i.0.clone();
+                row.append(&mut j.0.clone());
+                let row = Row(row);
+                if predicate((&columns, &row)) {
+                    rows.push(row);
+                    did_add_row = true;
+                }
+            }
+
+            if !did_add_row {
+                let row = match join_kind {
+                    JoinKind::Left => {
+                        let mut row = i.0.clone();
+                        let mut nulls = {
+                            let mut nulls = Vec::with_capacity(rhs_column_count);
+                            for _i in 0..rhs_column_count {
+                                nulls.push(Value::Null);
+                            }
+                            nulls
+                        };
+                        row.append(&mut nulls);
+                        Some(Row(row))
+                    }
+                    JoinKind::Right => {
+                        let mut row = i.0.clone();
+                        let mut nulls = {
+                            let mut nulls = Vec::with_capacity(lhs_column_count);
+                            for _i in 0..lhs_column_count {
+                                nulls.push(Value::Null);
+                            }
+                            nulls
+                        };
+                        nulls.append(&mut row);
+                        Some(Row(nulls))
+                    }
+                    _ => None,
+                };
+
+                if row.is_some() {
+                    rows.push(row.unwrap());
+                }
+            }
+        }
+
+        mem::swap(&mut self.rows, &mut rows);
+        mem::swap(&mut columns, &mut self.columns);
     }
 }
 

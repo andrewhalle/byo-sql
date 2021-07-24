@@ -10,7 +10,7 @@ pub struct Join<'input> {
     pub condition: Expression<'input>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum JoinKind {
     Inner,
     Left,
