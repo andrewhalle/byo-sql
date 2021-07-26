@@ -2,7 +2,7 @@ use std::cmp::Reverse;
 use std::fmt::{Display, Formatter};
 
 use super::{evaluate, evaluate_column};
-use crate::data::{Database, Table};
+use crate::data::{Database, Row, Table};
 use crate::parse::ast::{OrderByDirection, SelectQuery};
 
 pub type Success = Table;
@@ -19,11 +19,12 @@ impl Display for Error {
 type QueryResult = Result<Success, Error>;
 
 impl Database {
-    pub fn execute_select(&self, query: SelectQuery<'_>) -> QueryResult {
+    fn queried_tables(&self, query: &SelectQuery<'_>) -> Table {
         // start with the root table
         let mut result = self.find_table(query.table.root_table.name.0).clone();
         result.prefix_column_names(&format!("{}.", query.table.root_table.as_str()));
 
+        // add all joined tables
         for join in &query.table.joins {
             let mut table = self.find_table(join.table.name.0).clone();
             table.prefix_column_names(&format!("{}.", join.table.as_str()));
@@ -37,6 +38,10 @@ impl Database {
             );
         }
 
+        result
+    }
+
+    fn apply_query_transformations(&self, query: &SelectQuery<'_>, result: &mut Table) {
         if let Some(filter) = &query.filter {
             result.filter(|evaluation_context| {
                 evaluate(filter, Some(evaluation_context), None).is_true()
@@ -57,20 +62,43 @@ impl Database {
         if let Some(rows) = &query.limit {
             result.limit(evaluate(rows, None, None).as_number() as usize);
         }
+    }
 
-        let result = result.select(
-            |columns| {
-                let mut new_columns = Vec::new();
+    pub fn execute_select(&self, query: SelectQuery<'_>) -> QueryResult {
+        let mut result = self.queried_tables(&query);
+        self.apply_query_transformations(&query, &mut result);
+
+        Ok(apply_selection(&query, &result))
+    }
+}
+
+fn apply_selection(query: &SelectQuery<'_>, result: &Table) -> Table {
+    result.select(
+        |columns| {
+            let mut new_columns = Vec::new();
+
+            for expr in &query.select_list {
+                new_columns.push(evaluate_column(expr, columns));
+            }
+
+            new_columns
+        },
+        |columns, rows| {
+            let mut new_rows = Vec::new();
+
+            for row in rows {
+                // TODO at this point, we know how many values there are going to be. can
+                // pre-allocate space
+                let mut new_row = Vec::new();
 
                 for expr in &query.select_list {
-                    new_columns.push(evaluate_column(expr, columns));
+                    new_row.push(evaluate(expr, Some((columns, row)), None));
                 }
 
-                new_columns
-            },
-            |columns, rows| rows.clone(),
-        );
+                new_rows.push(Row(new_row));
+            }
 
-        Ok(result)
-    }
+            new_rows
+        },
+    )
 }
