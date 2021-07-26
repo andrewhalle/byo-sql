@@ -1,5 +1,5 @@
 use crate::data::{Column, Database, Row, Table, Value};
-use crate::parse::ast::Expression;
+use crate::parse::ast::{Expression, Literal};
 
 pub type RowEvaluationContext<'table> = (&'table Vec<Column>, &'table Row);
 
@@ -22,6 +22,26 @@ pub fn evaluate(
             let v2 = evaluate(&b.right, row_ctx, database);
 
             v1.op(b.op, v2)
+        }
+        _ => unreachable!(),
+    }
+}
+
+/// TODO
+pub fn evaluate_column(expr: &Expression<'_>, columns: &Vec<Column>) -> Column {
+    match expr {
+        Expression::ColumnIdentifier(i) => {
+            let idx = Table::get_column_idx(columns, i);
+
+            columns[idx].clone()
+        }
+        Expression::Literal(l) => Column {
+            name: String::from("?column?"),
+            datatype: <&Literal<'_> as Into<Value>>::into(l).datatype(),
+        },
+        Expression::BinaryOp(b) => {
+            // for now at least, both sides of a binary op must have the same type
+            evaluate_column(&b.left, columns)
         }
         _ => unreachable!(),
     }

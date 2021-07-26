@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 use std::fmt::{Display, Formatter};
 
-use super::evaluate;
+use super::{evaluate, evaluate_column};
 use crate::data::{Database, Table};
 use crate::parse::ast::{OrderByDirection, SelectQuery};
 
@@ -24,7 +24,7 @@ impl Database {
         let mut result = self.find_table(query.table.root_table.name.0).clone();
         result.prefix_column_names(&format!("{}.", query.table.root_table.as_str()));
 
-        for join in query.table.joins {
+        for join in &query.table.joins {
             let mut table = self.find_table(join.table.name.0).clone();
             table.prefix_column_names(&format!("{}.", join.table.as_str()));
 
@@ -58,9 +58,18 @@ impl Database {
             result.limit(evaluate(rows, None, None).as_number() as usize);
         }
 
-        /*
-        let result = result.select(query.select_list);
-        */
+        let result = result.select(
+            |columns| {
+                let mut new_columns = Vec::new();
+
+                for expr in &query.select_list {
+                    new_columns.push(evaluate_column(expr, columns));
+                }
+
+                new_columns
+            },
+            |columns, rows| rows.clone(),
+        );
 
         Ok(result)
     }

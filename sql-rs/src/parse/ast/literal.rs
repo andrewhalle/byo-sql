@@ -27,7 +27,7 @@ impl<'input> From<Pair<'input, Rule>> for Literal<'input> {
 
                 Literal::String(string_contents.as_str())
             }
-            Rule::number_literal => Literal::Number(inner_literal.as_str()),
+            Rule::number_literal => Literal::Number(inner_literal.as_str().trim()),
             Rule::boolean_literal => Literal::Boolean(inner_literal.as_str()),
             _ => unreachable!(),
         }

@@ -71,6 +71,16 @@ impl Value {
             _ => panic!(),
         }
     }
+
+    pub fn datatype(&self) -> Datatype {
+        match self {
+            // TODO placeholder
+            Value::Null => Datatype::Text,
+            Value::Number(_) => Datatype::Number,
+            Value::Text(_) => Datatype::Text,
+            Value::Boolean(_) => Datatype::Boolean,
+        }
+    }
 }
 
 macro_rules! value_op {
