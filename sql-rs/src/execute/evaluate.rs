@@ -1,5 +1,5 @@
 use crate::data::{Column, Database, Row, Table, Value};
-use crate::parse::ast::{Expression, Literal};
+use crate::parse::ast::{self, Expression, Literal};
 
 pub type RowEvaluationContext<'table> = (&'table Vec<Column>, &'table Row);
 
@@ -28,17 +28,33 @@ pub fn evaluate(
 }
 
 /// TODO
-pub fn evaluate_column(expr: &Expression<'_>, columns: &Vec<Column>) -> Column {
+pub fn evaluate_column(expr: &Expression<'_>, columns: &Vec<Column>) -> Vec<Column> {
     match expr {
-        Expression::ColumnIdentifier(i) => {
-            let idx = Table::get_column_idx(columns, i);
+        Expression::ColumnIdentifier(i) => match &i.name {
+            ast::Column::Star => columns
+                .iter()
+                .filter(|c| match &i.alias {
+                    None => true,
+                    Some(alias) => {
+                        if c.name.contains(".") {
+                            alias.0 == c.name.rsplit_once(".").unwrap().0
+                        } else {
+                            alias.0 == c.name
+                        }
+                    }
+                })
+                .map(Clone::clone)
+                .collect(),
+            _ => {
+                let idx = Table::get_column_idx(columns, i);
 
-            columns[idx].clone()
-        }
-        Expression::Literal(l) => Column {
+                vec![columns[idx].clone()]
+            }
+        },
+        Expression::Literal(l) => vec![Column {
             name: String::from("?column?"),
             datatype: <&Literal<'_> as Into<Value>>::into(l).datatype(),
-        },
+        }],
         Expression::BinaryOp(b) => {
             // for now at least, both sides of a binary op must have the same type
             evaluate_column(&b.left, columns)

@@ -211,20 +211,22 @@ impl Display for Table {
         writeln!(f, "{}", columns.join(","))?;
 
         // write rows
-        let num_rows = self.rows.len();
-        for row in &self.rows[..num_rows - 1] {
-            let values: Vec<_> = row.0.iter().map(|v| v.to_string()).collect();
-            let values: Vec<_> = values.iter().map(|s| s.as_str()).collect();
-            writeln!(f, "{}", values.join(","))?;
-        }
+        if self.rows.len() > 0 {
+            let num_rows = self.rows.len();
+            for row in &self.rows[..num_rows - 1] {
+                let values: Vec<_> = row.0.iter().map(|v| v.to_string()).collect();
+                let values: Vec<_> = values.iter().map(|s| s.as_str()).collect();
+                writeln!(f, "{}", values.join(","))?;
+            }
 
-        let values: Vec<_> = self.rows[num_rows - 1]
-            .0
-            .iter()
-            .map(|v| v.to_string())
-            .collect();
-        let values: Vec<_> = values.iter().map(|s| s.as_str()).collect();
-        write!(f, "{}", values.join(","))?;
+            let values: Vec<_> = self.rows[num_rows - 1]
+                .0
+                .iter()
+                .map(|v| v.to_string())
+                .collect();
+            let values: Vec<_> = values.iter().map(|s| s.as_str()).collect();
+            write!(f, "{}", values.join(","))?;
+        }
 
         Ok(())
     }

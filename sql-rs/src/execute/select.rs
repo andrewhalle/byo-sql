@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 
 use super::{evaluate, evaluate_column};
 use crate::data::{Database, Row, Table};
-use crate::parse::ast::{OrderByDirection, SelectQuery};
+use crate::parse::ast::{self, Expression, OrderByDirection, SelectQuery};
 
 pub type Success = Table;
 
@@ -74,10 +74,11 @@ impl Database {
 
 fn apply_selection(query: &SelectQuery<'_>, result: &Table) -> Table {
     // generate the columns of the new table
-    let mut new_columns = Vec::new();
-    for expr in &query.select_list {
-        new_columns.push(evaluate_column(expr, &result.columns));
-    }
+    let new_columns: Vec<_> = query
+        .select_list
+        .iter()
+        .flat_map(|expr| evaluate_column(expr, &result.columns))
+        .collect();
 
     // generate the rows of the new table
     let mut new_rows = Vec::new();
@@ -87,7 +88,34 @@ fn apply_selection(query: &SelectQuery<'_>, result: &Table) -> Table {
         let mut new_row = Vec::new();
 
         for expr in &query.select_list {
-            new_row.push(evaluate(expr, Some((&result.columns, row)), None));
+            match expr {
+                Expression::ColumnIdentifier(
+                    i
+                    @
+                    ast::ColumnIdentifier {
+                        name: ast::Column::Star,
+                        ..
+                    },
+                ) => {
+                    let mut values = (&result.columns)
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, c)| match &i.alias {
+                            None => true,
+                            Some(alias) => {
+                                if c.name.contains(".") {
+                                    alias.0 == c.name.rsplit_once(".").unwrap().0
+                                } else {
+                                    alias.0 == c.name
+                                }
+                            }
+                        })
+                        .map(|(idx, _)| row.0[idx].clone())
+                        .collect();
+                    new_row.append(&mut values);
+                }
+                _ => new_row.push(evaluate(expr, Some((&result.columns, row)), None)),
+            }
         }
 
         new_rows.push(Row(new_row));
