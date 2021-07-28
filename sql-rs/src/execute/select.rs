@@ -73,32 +73,28 @@ impl Database {
 }
 
 fn apply_selection(query: &SelectQuery<'_>, result: &Table) -> Table {
-    result.select(
-        |columns| {
-            let mut new_columns = Vec::new();
+    // generate the columns of the new table
+    let mut new_columns = Vec::new();
+    for expr in &query.select_list {
+        new_columns.push(evaluate_column(expr, &result.columns));
+    }
 
-            for expr in &query.select_list {
-                new_columns.push(evaluate_column(expr, columns));
-            }
+    // generate the rows of the new table
+    let mut new_rows = Vec::new();
+    for row in &result.rows {
+        // TODO at this point, we know how many values there are going to be. can
+        // pre-allocate space
+        let mut new_row = Vec::new();
 
-            new_columns
-        },
-        |columns, rows| {
-            let mut new_rows = Vec::new();
+        for expr in &query.select_list {
+            new_row.push(evaluate(expr, Some((&result.columns, row)), None));
+        }
 
-            for row in rows {
-                // TODO at this point, we know how many values there are going to be. can
-                // pre-allocate space
-                let mut new_row = Vec::new();
+        new_rows.push(Row(new_row));
+    }
 
-                for expr in &query.select_list {
-                    new_row.push(evaluate(expr, Some((columns, row)), None));
-                }
-
-                new_rows.push(Row(new_row));
-            }
-
-            new_rows
-        },
-    )
+    Table {
+        columns: new_columns,
+        rows: new_rows,
+    }
 }

@@ -150,20 +150,6 @@ impl Table {
         mem::swap(&mut self.rows, &mut rows);
         mem::swap(&mut columns, &mut self.columns);
     }
-
-    pub fn select<
-        F1: Fn(&Vec<Column>) -> Vec<Column>,
-        F2: Fn(&Vec<Column>, &Vec<Row>) -> Vec<Row>,
-    >(
-        &self,
-        column_fn: F1,
-        row_fn: F2,
-    ) -> Table {
-        Table {
-            columns: column_fn(&self.columns),
-            rows: row_fn(&self.columns, &self.rows),
-        }
-    }
 }
 
 // utilities
