@@ -25,7 +25,7 @@ column_identifier = { (identifier ~ "." ~ column) | column }
 // a ;
 
 queries = { query+ }
-query = { (select_query | insert_query | create_table_query) ~ ";" }
+query = { (select_query | insert_query | create_table_query | update_query) ~ ";" }
 
 // select queries, get data from the database
 
@@ -94,3 +94,7 @@ op = _{ greater_equal | less_equal | greater | less | and | or | equal | plus | 
   plus = { "+" }
   minus = { "-" }
 count_star = { "count(*)" }
+
+update_query = { "update" ~ identifier ~ "set" ~ assignment_list ~ where_clause }
+assignment_list = { assignment ~ ("," ~ assignment)* }
+assignment = { identifier ~ "=" ~ literal }
