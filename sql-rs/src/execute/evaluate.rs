@@ -1,4 +1,4 @@
-use crate::data::{Column, Database, Row, Table, Value};
+use crate::data::{Column, Database, Datatype, Row, Table, Value};
 use crate::parse::ast::{self, Expression, Literal};
 
 pub type RowEvaluationContext<'table> = (&'table Vec<Column>, &'table Row);
@@ -59,6 +59,9 @@ pub fn evaluate_column(expr: &Expression<'_>, columns: &Vec<Column>) -> Vec<Colu
             // for now at least, both sides of a binary op must have the same type
             evaluate_column(&b.left, columns)
         }
-        _ => unreachable!(),
+        Expression::CountStar => vec![Column {
+            name: String::from("count"),
+            datatype: Datatype::Number,
+        }],
     }
 }

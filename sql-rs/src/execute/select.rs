@@ -2,7 +2,7 @@ use std::cmp::Reverse;
 use std::fmt::{Display, Formatter};
 
 use super::{evaluate, evaluate_column};
-use crate::data::{Database, Row, Table};
+use crate::data::{Database, Row, Table, Value};
 use crate::parse::ast::{self, Expression, OrderByDirection, SelectQuery};
 
 pub type Success = Table;
@@ -82,43 +82,59 @@ fn apply_selection(query: &SelectQuery<'_>, result: &Table) -> Table {
 
     // generate the rows of the new table
     let mut new_rows = Vec::new();
-    for row in &result.rows {
-        // TODO at this point, we know how many values there are going to be. can
-        // pre-allocate space
+
+    if matches!(&query.select_list[0], Expression::CountStar) {
         let mut new_row = Vec::new();
 
         for expr in &query.select_list {
             match expr {
-                Expression::ColumnIdentifier(
-                    i
-                    @
-                    ast::ColumnIdentifier {
-                        name: ast::Column::Star,
-                        ..
-                    },
-                ) => {
-                    let mut values = (&result.columns)
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, c)| match &i.alias {
-                            None => true,
-                            Some(alias) => {
-                                if c.name.contains(".") {
-                                    alias.0 == c.name.rsplit_once(".").unwrap().0
-                                } else {
-                                    alias.0 == c.name
-                                }
-                            }
-                        })
-                        .map(|(idx, _)| row.0[idx].clone())
-                        .collect();
-                    new_row.append(&mut values);
+                Expression::CountStar => {
+                    new_row.push(Value::Number(result.rows.len() as u32));
                 }
-                _ => new_row.push(evaluate(expr, Some((&result.columns, row)), None)),
+                _ => unreachable!(),
             }
         }
 
         new_rows.push(Row(new_row));
+    } else {
+        for row in &result.rows {
+            // TODO at this point, we know how many values there are going to be. can
+            // pre-allocate space
+            let mut new_row = Vec::new();
+
+            for expr in &query.select_list {
+                match expr {
+                    Expression::ColumnIdentifier(
+                        i
+                        @
+                        ast::ColumnIdentifier {
+                            name: ast::Column::Star,
+                            ..
+                        },
+                    ) => {
+                        let mut values = (&result.columns)
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, c)| match &i.alias {
+                                None => true,
+                                Some(alias) => {
+                                    if c.name.contains(".") {
+                                        alias.0 == c.name.rsplit_once(".").unwrap().0
+                                    } else {
+                                        alias.0 == c.name
+                                    }
+                                }
+                            })
+                            .map(|(idx, _)| row.0[idx].clone())
+                            .collect();
+                        new_row.append(&mut values);
+                    }
+                    _ => new_row.push(evaluate(expr, Some((&result.columns, row)), None)),
+                }
+            }
+
+            new_rows.push(Row(new_row));
+        }
     }
 
     Table {
