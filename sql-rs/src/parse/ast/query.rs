@@ -1,4 +1,4 @@
-use super::{CreateTableQuery, InsertQuery, SelectQuery};
+use super::{CreateTableQuery, InsertQuery, SelectQuery, UpdateQuery};
 
 /// The root of the AST, representing a single query.
 ///
@@ -8,6 +8,7 @@ pub enum Query<'input> {
     SelectQuery(SelectQuery<'input>),
     InsertQuery(InsertQuery<'input>),
     CreateTableQuery(CreateTableQuery<'input>),
+    UpdateQuery(UpdateQuery<'input>),
 }
 
 use crate::parse::Rule;
@@ -23,6 +24,7 @@ impl<'input> From<Pair<'input, Rule>> for Query<'input> {
             Rule::select_query => Query::SelectQuery(query.into()),
             Rule::insert_query => Query::InsertQuery(query.into()),
             Rule::create_table_query => Query::CreateTableQuery(query.into()),
+            Rule::update_query => Query::UpdateQuery(query.into()),
             _ => unreachable!(),
         }
     }

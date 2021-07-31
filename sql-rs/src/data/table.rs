@@ -30,10 +30,17 @@ impl Table {
             .iter()
             .enumerate()
             .find(|(_, column)| {
-                let mut parts = column.name.split(".");
+                let name = {
+                    let mut parts = column.name.split(".");
 
-                let _alias = parts.next().unwrap();
-                let name = parts.next().unwrap();
+                    let first = parts.next().unwrap();
+                    let second = parts.next();
+
+                    match second {
+                        Some(name) => name,
+                        None => first,
+                    }
+                };
 
                 match &column_identifier.alias {
                     None => name == column_identifier.as_string(),
@@ -52,6 +59,21 @@ impl Table {
         self.rows.retain(|row| predicate((&columns, row)));
 
         mem::swap(&mut columns, &mut self.columns);
+    }
+
+    pub fn filter_mut<F: Fn(RowEvaluationContext) -> bool>(
+        &mut self,
+        predicate: F,
+    ) -> Vec<&mut Row> {
+        let mut columns = Vec::new();
+        mem::swap(&mut columns, &mut self.columns);
+
+        let mut rows: Vec<&mut Row> = self.rows.iter_mut().collect();
+        rows.retain(|row| predicate((&columns, row)));
+
+        mem::swap(&mut columns, &mut self.columns);
+
+        rows
     }
 
     pub fn limit(&mut self, limit: usize) {
@@ -200,6 +222,21 @@ impl Table {
     pub fn compatible_type(&self, column_index: usize, value: &Value) -> bool {
         let column = &self.columns[column_index];
         value.assignable_to(column.datatype)
+    }
+
+    pub fn get_update_indices(&self, cols: &[&str]) -> Vec<usize> {
+        let self_columns: Vec<(usize, &str)> = self
+            .columns
+            .iter()
+            .map(|c| c.name.as_str())
+            .enumerate()
+            .collect();
+        let indices = cols
+            .iter()
+            .map(|c1| self_columns.iter().find(|(_, c2)| c1 == c2).unwrap().0)
+            .collect();
+
+        indices
     }
 }
 

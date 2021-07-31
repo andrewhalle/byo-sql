@@ -13,6 +13,10 @@ mod create_table;
 pub use create_table::*;
 
 /// TODO doc
+mod update;
+pub use update::*;
+
+/// TODO doc
 mod evaluate;
 pub use evaluate::*;
 
@@ -26,6 +30,7 @@ pub enum Success {
     Select(select::Success),
     Insert(insert::Success),
     CreateTable(create_table::Success),
+    Update(update::Success),
 }
 
 impl Display for Success {
@@ -34,6 +39,7 @@ impl Display for Success {
             Success::Select(s) => write!(f, "{}", s),
             Success::CreateTable(s) => write!(f, "{}", s),
             Success::Insert(s) => write!(f, "{}", s),
+            Success::Update(s) => write!(f, "{}", s),
         }
     }
 }
@@ -67,6 +73,12 @@ impl From<create_table::Error> for Error {
     }
 }
 
+impl From<update::Error> for Error {
+    fn from(_: update::Error) -> Self {
+        Error::QueryFailed
+    }
+}
+
 impl Database {
     pub fn execute(&mut self, query: Query<'_>) -> Result<Success, Error> {
         Ok(match query {
@@ -75,6 +87,7 @@ impl Database {
             Query::CreateTableQuery(query) => {
                 Success::CreateTable(self.execute_create_table(query)?)
             }
+            Query::UpdateQuery(query) => Success::Update(self.execute_update(query)?),
         })
     }
 }

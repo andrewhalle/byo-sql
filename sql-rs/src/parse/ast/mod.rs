@@ -51,6 +51,12 @@ pub use create_table_column::*;
 mod datatype;
 pub use datatype::*;
 
+mod update_query;
+pub use update_query::*;
+
+mod assignment;
+pub use assignment::*;
+
 // Template
 // /// <Quick description.>
 // ///
