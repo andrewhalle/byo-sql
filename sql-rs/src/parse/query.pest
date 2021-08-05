@@ -81,8 +81,8 @@ datatype = { "text" | "number" | "boolean" }
 // work on actual expressions
 // handle precedence with a PrecClimber in code
 expression = { atom ~ (op ~ atom)* }
-atom = _{ count_star | ("(" ~ expression ~ ")") | literal | column_identifier }
-op = _{ greater_equal | less_equal | greater | less | and | or | equal | plus | minus }
+atom = _{ count_star | ("(" ~ select_query ~ ")") | ("(" ~ expression ~ ")") | literal | column_identifier }
+op = _{ greater_equal | less_equal | greater | less | and | or | in_op | equal | plus | minus }
   greater_equal = { ">=" }
   less_equal = { "<=" }
   greater = { ">" }
@@ -90,6 +90,7 @@ op = _{ greater_equal | less_equal | greater | less | and | or | equal | plus | 
   // and and or are possible prefixes to other words, so they better be followed by whitespace
   and = @{ "and" ~ WHITESPACE }
   or = @{ "or" ~ WHITESPACE }
+  in_op = @{ "in" ~ WHITESPACE }
   equal = { "=" }
   plus = { "+" }
   minus = { "-" }

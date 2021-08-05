@@ -17,6 +17,7 @@ pub fn evaluate(
             row_ctx.1 .0[idx].clone()
         }
         Expression::Literal(l) => l.into(),
+        Expression::Subquery(_sq) => todo!(),
         Expression::BinaryOp(b) => {
             let v1 = evaluate(&b.left, row_ctx, database);
             let v2 = evaluate(&b.right, row_ctx, database);
@@ -51,6 +52,7 @@ pub fn evaluate_column(expr: &Expression<'_>, columns: &Vec<Column>) -> Vec<Colu
                 vec![columns[idx].clone()]
             }
         },
+        Expression::Subquery(_sq) => todo!(),
         Expression::Literal(l) => vec![Column {
             name: String::from("?column?"),
             datatype: <&Literal<'_> as Into<Value>>::into(l).datatype(),

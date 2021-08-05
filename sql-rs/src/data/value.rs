@@ -36,6 +36,7 @@ impl Value {
             ExpressionOp::Less => Value::Boolean(self.less(&rhs)),
             ExpressionOp::And => Value::Boolean(self.is_true() && rhs.is_true()),
             ExpressionOp::Or => Value::Boolean(self.is_true() || rhs.is_true()),
+            ExpressionOp::In => todo!(),
             ExpressionOp::Equal => Value::Boolean(self == rhs),
             ExpressionOp::Plus => Value::Number(self.as_number() + rhs.as_number()),
             ExpressionOp::Minus => Value::Number(self.as_number() - rhs.as_number()),

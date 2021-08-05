@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 
 use pest::prec_climber::{Operator, PrecClimber};
 
-use super::{ColumnIdentifier, Listable, Literal};
+use super::{ColumnIdentifier, Listable, Literal, SelectQuery};
 
 /// An expression that can be evaluated.
 ///
@@ -15,6 +15,7 @@ pub enum Expression<'input> {
     Literal(Literal<'input>),
     ColumnIdentifier(ColumnIdentifier<'input>),
     BinaryOp(BinaryOp<'input>),
+    Subquery(Box<SelectQuery<'input>>),
 }
 
 #[derive(Debug)]
@@ -32,6 +33,7 @@ pub enum ExpressionOp {
     Less,
     And,
     Or,
+    In,
     Equal,
     Plus,
     Minus,
@@ -43,7 +45,7 @@ lazy_static! {
         use Rule::*;
 
         PrecClimber::new(vec![
-            Operator::new(and, Left) | Operator::new(or, Left),
+            Operator::new(and, Left) | Operator::new(or, Left) | Operator::new(in_op, Left),
             Operator::new(greater_equal, Left)
                 | Operator::new(greater, Left)
                 | Operator::new(less_equal, Left)
@@ -65,6 +67,7 @@ impl<'input> From<Pair<'input, Rule>> for Expression<'input> {
             expression.into_inner(),
             |pair: Pair<Rule>| match pair.as_rule() {
                 Rule::column_identifier => Expression::ColumnIdentifier(pair.into()),
+                Rule::select_query => Expression::Subquery(Box::new(pair.into())),
                 Rule::expression => pair.into(),
                 Rule::literal => Expression::Literal(pair.into()),
                 Rule::count_star => Expression::CountStar,
@@ -93,6 +96,7 @@ impl From<Pair<'_, Rule>> for ExpressionOp {
                 || rule == less
                 || rule == and
                 || rule == or
+                || rule == in_op
                 || rule == equal
                 || rule == plus
                 || rule == minus
@@ -105,6 +109,7 @@ impl From<Pair<'_, Rule>> for ExpressionOp {
             less => ExpressionOp::Less,
             and => ExpressionOp::And,
             or => ExpressionOp::Or,
+            in_op => ExpressionOp::In,
             equal => ExpressionOp::Equal,
             plus => ExpressionOp::Plus,
             minus => ExpressionOp::Minus,
