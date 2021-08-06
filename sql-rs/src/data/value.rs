@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use crate::data::Datatype;
+use crate::data::{Datatype, ValueList};
 use crate::parse::ast::ExpressionOp;
 
 /// TODO short description.
@@ -14,6 +14,7 @@ pub enum Value {
     Number(u32),
     Text(String),
     Boolean(bool),
+    List(ValueList),
 }
 
 impl Display for Value {
@@ -23,6 +24,7 @@ impl Display for Value {
             Value::Text(s) => write!(f, "{}", s),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::Null => write!(f, "null"),
+            Value::List(l) => write!(f, "{}", l),
         }
     }
 }
@@ -36,7 +38,15 @@ impl Value {
             ExpressionOp::Less => Value::Boolean(self.less(&rhs)),
             ExpressionOp::And => Value::Boolean(self.is_true() && rhs.is_true()),
             ExpressionOp::Or => Value::Boolean(self.is_true() || rhs.is_true()),
-            ExpressionOp::In => todo!(),
+            ExpressionOp::In => {
+                assert!(!matches!(self, Value::List(_)));
+                assert!(matches!(rhs, Value::List(_)));
+
+                match rhs {
+                    Value::List(l) => Value::Boolean(l.contains(self)),
+                    _ => unreachable!(),
+                }
+            }
             ExpressionOp::Equal => Value::Boolean(self == rhs),
             ExpressionOp::Plus => Value::Number(self.as_number() + rhs.as_number()),
             ExpressionOp::Minus => Value::Number(self.as_number() - rhs.as_number()),
@@ -49,6 +59,7 @@ impl Value {
             Value::Number(_) => datatype == Datatype::Number,
             Value::Text(_) => datatype == Datatype::Text,
             Value::Boolean(_) => datatype == Datatype::Boolean,
+            _ => unreachable!(),
         }
     }
 
@@ -80,6 +91,7 @@ impl Value {
             Value::Number(_) => Datatype::Number,
             Value::Text(_) => Datatype::Text,
             Value::Boolean(_) => Datatype::Boolean,
+            _ => unreachable!(),
         }
     }
 }

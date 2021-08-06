@@ -17,7 +17,9 @@ pub fn evaluate(
             row_ctx.1 .0[idx].clone()
         }
         Expression::Literal(l) => l.into(),
-        Expression::Subquery(_sq) => todo!(),
+        Expression::Subquery(sq) => {
+            Value::List(database.unwrap().execute_select(sq).unwrap().into())
+        }
         Expression::BinaryOp(b) => {
             let v1 = evaluate(&b.left, row_ctx, database);
             let v2 = evaluate(&b.right, row_ctx, database);

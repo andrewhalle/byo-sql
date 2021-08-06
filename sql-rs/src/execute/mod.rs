@@ -82,7 +82,7 @@ impl From<update::Error> for Error {
 impl Database {
     pub fn execute(&mut self, query: Query<'_>) -> Result<Success, Error> {
         Ok(match query {
-            Query::SelectQuery(query) => Success::Select(self.execute_select(query)?),
+            Query::SelectQuery(query) => Success::Select(self.execute_select(&query)?),
             Query::InsertQuery(query) => Success::Insert(self.execute_insert(query)?),
             Query::CreateTableQuery(query) => {
                 Success::CreateTable(self.execute_create_table(query)?)

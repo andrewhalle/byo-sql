@@ -44,7 +44,7 @@ impl Database {
     fn apply_query_transformations(&self, query: &SelectQuery<'_>, result: &mut Table) {
         if let Some(filter) = &query.filter {
             result.filter(|evaluation_context| {
-                evaluate(filter, Some(evaluation_context), None).is_true()
+                evaluate(filter, Some(evaluation_context), Some(self)).is_true()
             });
         }
 
@@ -64,7 +64,7 @@ impl Database {
         }
     }
 
-    pub fn execute_select(&self, query: SelectQuery<'_>) -> QueryResult {
+    pub fn execute_select(&self, query: &SelectQuery<'_>) -> QueryResult {
         let mut result = self.queried_tables(&query);
         self.apply_query_transformations(&query, &mut result);
 
