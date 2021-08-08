@@ -32,14 +32,16 @@ Implemented:
     * LIMIT
     * count(*)
   * single table, all literal update
+  * subqueries
 
 Want to implement:
-  * GROUP BY
-  * subqueries
-  * query planning / non-full table scans
   * primary keys
+  * GROUP BY
+  * query planning / non-full table scans
   * indexes
+  * other datatypes
   * proper aggregate functions (sum, max) count(something other than *)
+  * persistence?
 
 I'd also like to write a small markdown book (more of a journal) documenting my
 approach and learnings.
