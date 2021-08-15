@@ -13,3 +13,4 @@ structopt = { version = "0.3.21", default-features = false }
 ansi_term = "0.12.1"
 lazy_static = "1.4.0"
 thiserror = "1.0.26"
+rustyline = "8.2.0"

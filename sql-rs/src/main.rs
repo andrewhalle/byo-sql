@@ -1,11 +1,13 @@
 use std::fs;
-use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 use std::process;
 
 use structopt::StructOpt;
 
 use ansi_term::Colour;
+
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 use sql_rs::data::Database;
 use sql_rs::parse::parse_queries;
@@ -37,36 +39,35 @@ pub fn seed(database: &mut Database, seed_file: PathBuf) {
 }
 
 pub fn console(database: &mut Database) {
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
-    let mut reader = stdin.lock();
-    let mut line = String::new();
+    let mut rl = Editor::<()>::new();
 
     loop {
-        line.clear();
-        print!("> ");
-        stdout.flush().unwrap();
-        reader.read_line(&mut line).unwrap();
+        let readline = rl.readline("> ");
+        match readline {
+            Ok(line) => {
+                let queries = parse_queries(&line);
 
-        if line == "" {
-            println!();
-            break;
-        }
-
-        let queries = parse_queries(&line);
-
-        match queries {
-            Ok(queries) => {
-                for query in queries.0 {
-                    match database.execute(query) {
-                        Ok(s) => println!("{}", s),
-                        Err(e) => println!("{}", e),
+                match queries {
+                    Ok(queries) => {
+                        for query in queries.0 {
+                            match database.execute(query) {
+                                Ok(s) => println!("{}", s),
+                                Err(e) => println!("{}", e),
+                            }
+                        }
+                    }
+                    Err(parse_error) => {
+                        println!("{}", parse_error);
                     }
                 }
+
+                rl.add_history_entry(line);
             }
-            Err(parse_error) => {
-                println!("{}", parse_error);
+            Err(ReadlineError::Eof) => {
+                println!();
+                break;
             }
+            _ => panic!(),
         }
     }
 }
